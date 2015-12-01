@@ -96,8 +96,10 @@ def epg_grad(FpFmZ, noadd=False):
     return FpFmZ
 
 
-def FSE_signal(angles_rad, TE, T1, T2):
-    """Simulate Fast Spin Echo sequence with specific flip angle sequence.
+def FSE_CPMG(angles_rad, TE, T1, T2):
+    """Simulate Fast Spin-Echo CPMG sequence with specific flip angle train.
+    Prior to the flip angle train, a 90 degree pulse is applied in the Y direction.
+    The flip angle train is then applied in the X direction.
 
     INPUT:
         angles_rad = array of flip angles in radians equal to echo train length
@@ -106,39 +108,55 @@ def FSE_signal(angles_rad, TE, T1, T2):
         T2 = T2 value in seconds
 
     OUTPUT:
-        Complex signal value at each echo time
+        Transverse magnetization at each echo time
         
     """
 
-    S, S2 = FSE_signal2(angles_rad, TE, T1, T2)
+    S, S2 = FSE_CPMG2(angles_rad, TE, T1, T2)
 
     return S
 
-def FSE_signal2(angles_rad, TE, T1, T2):
-    """Simulate Fast Spin Echo sequence with specific flip angle sequence.
+
+def FSE_CPMG2(angles_rad, TE, T1, T2):
+    """Same as FSE_CPMG, but returns Mxy and Mz"""
+
+    angles2_rad = np.insert(angles_rad, 0, pi/2)
+    phase2_rad = np.zeros(angles2_rad.shape)
+    phase2_rad[0] = pi/2
+
+    return FSE_signal2(angles2_rad, phase2_rad, TE, T1, T2)
+
+
+def FSE_signal2(angles_rad, phase_rad, TE, T1, T2):
+    """Simulate Fast Spin Echo sequence with specific flip angles and phase.
 
     INPUT:
-        angles_rad = array of flip angles in radians equal to echo train length
+        angles_rad = array of RF flip angles in radians equal to (echo train length plus one)
+        phase_rad = array of RF phase in radians equal to (echo train length plus one)
         TE = echo time/spacing
         T1 = T1 value in seconds
         T2 = T2 value in seconds
 
     OUTPUT:
-        S1 -- Complex signal value at each echo time
-        S2 -- Transverse magnetization at each echo time
+        S1 -- Transverse magnetization at each echo time
+        S2 -- Longitudinal magnetization at each echo time
 
     """
 
-    T = len(angles_rad)
+    T = len(angles_rad) - 1 # don't include initial tip
     S = np.zeros((T,1), dtype=complex)
     S2 = np.zeros((T,1), dtype=complex)
 
     P = np.array([[0],[0],[1]])    # initially in M0
 
-    P = epg_rf(P, pi/2, pi/2)[0]    # 90 degree tip
+    P = epg_rf(P, angles_rad[0], phase_rad[0])[0]  # initial tip
+
+    angles_rad = angles_rad[1:]
+    phase_rad = phase_rad[1:]
 
     for i in range(T):
         alpha = angles_rad[i]
+        phase = phase_rad[i]
         P = epg_relax(P, T1, T2, TE/2.)[0]
         P = epg_grad(P)
         P = epg_rf(P, alpha, 0)[0]
@@ -163,7 +181,7 @@ if __name__ == "__main__":
     angles = 120 * np.ones((N,))
     angles_rad = angles * pi / 180.
 
-    S = FSE_signal(angles_rad, TE, T1, T2)
+    S = FSE_CPMG(angles_rad, TE, T1, T2)
     S2 = abs(S)
     plt.plot(TE*1000*np.arange(1, N+1), S2)
     plt.xlabel('time (ms)')
