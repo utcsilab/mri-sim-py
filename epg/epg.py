@@ -128,6 +128,42 @@ def FSE_signal(angles_rad, TE, T1, T2):
         S[i] = P[0,0]
 
     return S
+
+def FSE_signal2(angles_rad, TE, T1, T2):
+    """Simulate Fast Spin Echo sequence with specific flip angle sequence.
+
+    INPUT:
+        angles_rad = array of flip angles in radians equal to echo train length
+        TE = echo time/spacing
+        T1 = T1 value in seconds
+        T2 = T2 value in seconds
+
+    OUTPUT:
+        S1 -- Complex signal value at each echo time
+        S2 -- Transverse magnetization at each echo time
+
+    """
+
+    T = len(angles_rad)
+    S = np.zeros((T,1), dtype=complex)
+    S2 = np.zeros((T,1), dtype=complex)
+
+    P = np.array([[0],[0],[1]])    # initially in M0
+
+    P = epg_rf(P, pi/2, pi/2)[0]    # 90 degree tip
+
+    for i in range(T):
+        alpha = angles_rad[i]
+        P = epg_relax(P, T1, T2, TE/2.)[0]
+        P = epg_grad(P)
+        P = epg_rf(P, alpha, 0)[0]
+        P = epg_relax(P, T1, T2, TE/2.)[0]
+        P = epg_grad(P)
+
+        S[i] = P[0,0]
+        S2[i] = P[0,2]
+
+    return S, S2
     
 
 if __name__ == "__main__":
@@ -139,7 +175,7 @@ if __name__ == "__main__":
     TE = 5e-3
 
     N = 100
-    angles = 180 * np.ones((N,))
+    angles = 120 * np.ones((N,))
     angles_rad = angles * pi / 180.
 
     S = FSE_signal(angles_rad, TE, T1, T2)
