@@ -55,3 +55,9 @@ docs/_build/
 
 # PyBuilder
 target/
+
+# notebook
+*.ipynb_checkpoints/
+
+# vim swp files
+*.swp
