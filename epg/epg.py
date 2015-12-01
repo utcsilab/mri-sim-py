@@ -110,22 +110,7 @@ def FSE_signal(angles_rad, TE, T1, T2):
         
     """
 
-    T = len(angles_rad)
-    S = np.zeros((T,1), dtype=complex)
-
-    P = np.array([[0],[0],[1]])    # initially in M0
-
-    P = epg_rf(P, pi/2, pi/2)[0]    # 90 degree tip
-
-    for i in range(T):
-        alpha = angles_rad[i]
-        P = epg_relax(P, T1, T2, TE/2.)[0]
-        P = epg_grad(P)
-        P = epg_rf(P, alpha, 0)[0]
-        P = epg_relax(P, T1, T2, TE/2.)[0]
-        P = epg_grad(P)
-
-        S[i] = P[0,0]
+    S, S2 = FSE_signal2(angles_rad, TE, T1, T2)
 
     return S
 
@@ -164,7 +149,7 @@ def FSE_signal2(angles_rad, TE, T1, T2):
         S2[i] = P[0,2]
 
     return S, S2
-    
+
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
