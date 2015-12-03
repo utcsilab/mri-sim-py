@@ -133,6 +133,35 @@ def epg_grad(FpFmZ, noadd=False):
     return FpFmZ
 
 
+def epg_TE(FpFmZ, alpha, phi, T1, T2, TE, noadd=False):
+    """ Propagate EPG states through a full TE, i.e.
+    relax -> grad -> rf -> grad -> relax
+
+    INPUT:
+        FpFmZ = 3xN vector of F+, F- and Z states.
+        alpha, phi = RF pulse flip angle phase in radians
+        T1, T2 = Relaxation times (same as T)
+        TE = Echo Time interval (same as T1,T2)
+        noadd = True to NOT add any higher-order states - assume
+                that they just go to zero.  Be careful - this
+                speeds up simulations, but may compromise accuracy!
+
+    OUTPUT:
+        FpFmZ = updated F+, F- and Z states.
+
+    SEE ALSO:
+           epg_grad, epg_rf, epg_relax
+   """
+
+    FpFmZ = epg_relax(FpFmZ, T1, T2, TE/2.)
+    FpFmZ = epg_grad(FpFmZ, noadd)
+    FpFmZ = epg_rf(FpFmZ, alpha, phi)
+    FpFmZ = epg_grad(FpFmZ, noadd )
+    FpFmZ = epg_relax(FpFmZ, T1, T2, TE/2.)
+
+    return FpFmZ
+
+
 def FSE_CPMG(angles_rad, TE, T1, T2):
     """Simulate Fast Spin-Echo CPMG sequence with specific flip angle train.
     Prior to the flip angle train, a 90 degree pulse is applied in the Y direction.
