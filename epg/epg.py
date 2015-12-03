@@ -13,6 +13,24 @@ def epg_rf(FpFmZ, alpha, phi):
 
     INPUT:
         FpFmZ = 3xN vector of F+, F- and Z states.
+		  alpha, phi = RF pulse flip angle phase in radians
+
+    OUTPUT:
+        FpFmZ = Updated FpFmZ state.
+
+    SEE ALSO:
+    epg_grad, epg_grelax
+    """
+
+    return epg_rf2(FpFmZ, alpha, phi)[0]
+
+def epg_rf2(FpFmZ, alpha, phi):
+    """ Propagate EPG states through an RF rotation of 
+    alpha, with phase phi (both radians).
+
+    INPUT:
+        FpFmZ = 3xN vector of F+, F- and Z states.
+		  alpha, phi = RF pulse flip angle phase in radians
 
     OUTPUT:
         FpFmZ = Updated FpFmZ state.
@@ -42,7 +60,26 @@ def epg_relax(FpFmZ, T1, T2, T):
 
     INPUT:
         FpFmZ = 3xN vector of F+, F- and Z states.
-        T1,T2 = Relaxation times (same as T)
+        T1, T2 = Relaxation times (same as T)
+        T = Time interval (same as T1,T2)
+
+    OUTPUT:
+        FpFmZ = updated F+, F- and Z states.
+
+    SEE ALSO:
+           epg_grad, epg_rf
+   """
+   
+    return epg_relax2(FpFmZ, T1, T2, T)[0]
+
+
+def epg_relax2(FpFmZ, T1, T2, T):
+    """ Propagate EPG states through a period of relaxation over
+    an interval T.
+
+    INPUT:
+        FpFmZ = 3xN vector of F+, F- and Z states.
+        T1, T2 = Relaxation times (same as T)
         T = Time interval (same as T1,T2)
 
     OUTPUT:
@@ -149,7 +186,7 @@ def FSE_signal2(angles_rad, phase_rad, TE, T1, T2):
 
     P = np.array([[0],[0],[1]])    # initially in M0
 
-    P = epg_rf(P, angles_rad[0], phase_rad[0])[0]  # initial tip
+    P = epg_rf(P, angles_rad[0], phase_rad[0])  # initial tip
 
     angles_rad = angles_rad[1:]
     phase_rad = phase_rad[1:]
@@ -157,16 +194,17 @@ def FSE_signal2(angles_rad, phase_rad, TE, T1, T2):
     for i in range(T):
         alpha = angles_rad[i]
         phase = phase_rad[i]
-        P = epg_relax(P, T1, T2, TE/2.)[0]
+        P = epg_relax(P, T1, T2, TE/2.)
         P = epg_grad(P)
-        P = epg_rf(P, alpha, 0)[0]
-        P = epg_relax(P, T1, T2, TE/2.)[0]
+        P = epg_rf(P, alpha, 0)
         P = epg_grad(P)
+        P = epg_relax(P, T1, T2, TE/2.)
 
         S[i] = P[0,0]
         S2[i] = P[0,2]
 
     return S, S2
+
 
 
 if __name__ == "__main__":
