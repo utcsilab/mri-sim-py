@@ -4,6 +4,7 @@ import numpy as np
 from numpy import pi, cos, sin, exp, conj
 from warnings import warn
 import epgcpmg as epg
+import time
 import sys
 
 
@@ -53,7 +54,7 @@ def loss_prime(theta1, theta2, angles_rad):
     x2 = epg.FSE_signal(angles_rad, TE, theta2['T1'], theta2['T2']).ravel()
 
     T = len(angles_rad)
-    alpha_prime = np.zeros((T, 1))
+    alpha_prime = np.zeros((T,))
 
     for i in range(T):
         x1_prime = sig_prime_i(theta1, angles_rad, i).ravel()
@@ -67,14 +68,6 @@ def loss_prime(theta1, theta2, angles_rad):
 
     return alpha_prime
 
-#
-    #M1 = x1 * x1_prime
-    #M2 = x2 * x2_prime
-    #M3 = x1 * x2_prime
-    #M4 = x2 * x1_prime
-#
-    #return M1 + M2 - M3 - M4
-
 
 def sig_prime_i(theta, angles_rad, idx):
     T1, T2 = get_params(theta)
@@ -85,67 +78,18 @@ def sig_prime_i(theta, angles_rad, idx):
 
     for i in range(T):
         alpha = angles_rad[i]
-        print 'z[%d] = FSE_TE(z[%d]' % (i, i-1)
         if i < idx:
             zi = epg.FSE_TE(zi, alpha, TE, T1, T2, noadd=True)
             z_prime[i] = 0
-            print 'z_prime[%d] = 0' % i
         elif i == idx:
             wi = epg.FSE_TE_prime(zi, alpha, TE, T1, T2, noadd=True)
-            print 'w[%d] = FSE_TE_PRIME(z[%d]' % (i, i-1)
             z_prime[i] = wi[0,0]
-            print 'z_prime[%d] = w[%d]' % (i, i)
         else:
             wi = epg.FSE_TE(wi, alpha, TE, T1, T2, noadd=True, recovery=False)
-            print 'w[%d] = FSE_TE(w[%d]' % (i, i-1)
-            print 'z_prime[%d] = w[%d]' % (i, i)
             z_prime[i] = wi[0,0]
-    print
 
     return z_prime
 
-
-
-    #for i in range(T):
-        #alpha = angles_rad[i]
-        #print 'w[%d] = FSE_TE_PRIME(z[%d]' % (i, i-1)
-        #print 'z[%d] = FSE_TE(z[%d]' % (i, i-1)
-        #wi = epg.FSE_TE_prime(zi, alpha, TE, T1, T2, noadd=True)
-        #zi = epg.FSE_TE(zi, alpha, TE, T1, T2, noadd=True)
-        #beta[i, :, :] = wi
-        #for j in range(i):
-            #print 'b[%d] = FSE_TE(b[%d]' % (j, j)
-            #beta[j, :, :] = epg.FSE_TE(beta[j, :, :], alpha, TE, T1, T2, noadd=True, recovery=False)
-
-    #for i in range(T):
-        #angles_prime[i] = beta[i,0,0]
-
-    #return angles_prime
-
-
-def sig_prime(theta, angles_rad):
-    T1, T2 = get_params(theta)
-    T = len(angles_rad)
-    zi = np.hstack((np.array([[1],[1],[0]]), np.zeros((3, T))))
-
-    angles_prime = np.zeros((T, 1))
-    beta = np.zeros((T, 3, T+1))
-
-    for i in range(T):
-        alpha = angles_rad[i]
-        print 'w[%d] = FSE_TE_PRIME(z[%d]' % (i, i-1)
-        print 'z[%d] = FSE_TE(z[%d]' % (i, i-1)
-        wi = epg.FSE_TE_prime(zi, alpha, TE, T1, T2, noadd=True)
-        zi = epg.FSE_TE(zi, alpha, TE, T1, T2, noadd=True)
-        beta[i, :, :] = wi
-        for j in range(i):
-            print 'b[%d] = FSE_TE(b[%d]' % (j, j)
-            beta[j, :, :] = epg.FSE_TE(beta[j, :, :], alpha, TE, T1, T2, noadd=True, recovery=False)
-
-    for i in range(T):
-        angles_prime[i] = beta[i,0,0]
-
-    return angles_prime
 
 def get_params(theta):
     return theta['T1'], theta['T2']
@@ -170,7 +114,7 @@ def numerical_gradient(theta1, theta2, angles_rad):
 
 
 if __name__ == "__main__":
-    #import matplotlib.pyplot as plt
+    import matplotlib.pyplot as plt
 
     T1 = 1000e-3
     T2 = 200e-3
@@ -182,7 +126,7 @@ if __name__ == "__main__":
     else:
         N = 10
 
-    angles = 150 * np.ones((N,))
+    angles = 120 * np.ones((N,))
     angles_rad = angles * pi / 180.
 
     S = epg.FSE_signal(angles_rad, TE, T1, T2)
@@ -190,14 +134,25 @@ if __name__ == "__main__":
 
     theta1 = {'T1': 1000e-3, 'T2': 200e-3}
     theta2 = {'T1': 1000e-3, 'T2': 500e-3}
+    t1 = time.time()
     NG = numerical_gradient(theta1, theta2, angles_rad[:N])
+    t2 = time.time()
     LP = loss_prime(theta1, theta2, angles_rad[:N])
-    print 'Numerical Gradient:\t', NG
-    print 'Analytical Gradient:\t', LP.T
-    #plt.plot(TE*1000*np.arange(1, N+1), S2)
-    #plt.xlabel('time (ms)')
-    #plt.ylabel('signal')
-    #plt.title('T1 = %.2f ms, T2 = %.2f ms' % (T1 * 1000, T2 * 1000))
-    #plt.show()
+    t3 = time.time()
+
+    NG_time = t2 - t1
+    LP_time = t3 - t2
+
+    print 'Numerical Gradient\t(%03.3f s)\t' % NG_time, NG
+    print
+    print 'Analytical Gradient\t(%03.3f s)\t' % LP_time, LP
+    print
+    print 'Error:', np.linalg.norm(NG - LP) / np.linalg.norm(NG)
+
+    plt.plot(TE*1000*np.arange(1, N+1), S2)
+    plt.xlabel('time (ms)')
+    plt.ylabel('signal')
+    plt.title('T1 = %.2f ms, T2 = %.2f ms' % (T1 * 1000, T2 * 1000))
+    plt.show()
     
 
