@@ -73,11 +73,20 @@ def rf_prime2(FpFmZ, alpha):
 
 
 
-def relax(FpFmZ, T1, T2, T):
-    """Same as relax2, but only returns FpFmZ"""
-    return relax2(FpFmZ, T1, T2, T)[0]
+def relax_mat(T, T1, T2):
+    E2 = exp(-T/T2)
+    E1 = exp(-T/T1)
 
-def relax2(FpFmZ, T1, T2, T):
+    EE = np.diag([E2, E2, E1])      # Decay of states due to relaxation alone.
+
+    return EE
+
+
+def relax(FpFmZ, T, T1, T2):
+    """Same as relax2, but only returns FpFmZ"""
+    return relax2(FpFmZ, T, T1, T2)[0]
+
+def relax2(FpFmZ, T, T1, T2):
     """ Propagate EPG states through a period of relaxation over
     an interval T.
 
@@ -136,7 +145,7 @@ def grad(FpFmZ, noadd=False):
 
 
 
-def FSE_TE(FpFmZ, alpha, T1, T2, TE, noadd=False):
+def FSE_TE(FpFmZ, alpha, TE, T1, T2, noadd=False, recovery=True):
     """ Propagate EPG states through a full TE, i.e.
     relax -> grad -> rf -> grad -> relax.
     Assumes CPMG condition, i.e. all states are real-valued.
@@ -155,11 +164,47 @@ def FSE_TE(FpFmZ, alpha, T1, T2, TE, noadd=False):
 
    """
 
-    FpFmZ = relax(FpFmZ, T1, T2, TE/2.)
+    EE = relax_mat(TE/2., T1, T2)
+
+    if recovery:
+        FpFmZ = relax(FpFmZ, TE/2., T1, T2)
+    else:
+        FpFmZ = np.dot(EE, FpFmZ)
     FpFmZ = grad(FpFmZ, noadd)
     FpFmZ = rf(FpFmZ, alpha)
     FpFmZ = grad(FpFmZ, noadd)
-    FpFmZ = relax(FpFmZ, T1, T2, TE/2.)
+    if recovery:
+        FpFmZ = relax(FpFmZ, TE/2., T1, T2)
+    else:
+        FpFmZ = np.dot(EE, FpFmZ)
+
+    return FpFmZ
+
+
+def FSE_TE_prime(FpFmZ, alpha, TE, T1, T2, noadd=False, recovery=True):
+    """ Propagate EPG states through a full TE, i.e.
+    relax -> grad -> rf -> grad -> relax.
+    Assumes CPMG condition, i.e. all states are real-valued.
+
+    INPUT:
+        FpFmZ = 3xN vector of F+, F- and Z states.
+        alpha = RF pulse flip angle in radians
+        T1, T2 = Relaxation times (same as TE)
+        TE = Echo Time interval (same as T1, T2)
+        noadd = True to NOT add any higher-order states - assume
+                that they just go to zero.  Be careful - this
+                speeds up simulations, but may compromise accuracy!
+
+    OUTPUT:
+        FpFmZ = updated F+, F- and Z states.
+
+   """
+
+    FpFmZ, EE = relax2(FpFmZ, TE/2., T1, T2)
+    FpFmZ = grad(FpFmZ, noadd)
+    FpFmZ = rf_prime(FpFmZ, alpha)
+    FpFmZ = grad(FpFmZ, noadd)
+    FpFmZ = np.dot(EE, FpFmZ)
 
     return FpFmZ
 
@@ -187,15 +232,15 @@ def FSE_signal2(angles_rad, TE, T1, T2):
     """
 
     T = len(angles_rad)
-    Mxy = np.zeros((T,1), dtype=complex)
-    Mz = np.zeros((T,1), dtype=complex)
+    Mxy = np.zeros((T,1))
+    Mz = np.zeros((T,1))
 
     P = np.array([[1],[1],[0]])  # initial tip
 
 
     for i in range(T):
         alpha = angles_rad[i]
-        P = FSE_TE(P, alpha, T1, T2, TE)
+        P = FSE_TE(P, alpha, TE, T1, T2)
 
         Mxy[i] = P[0,0]
         Mz[i] = P[0,2]
