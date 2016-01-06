@@ -123,6 +123,20 @@ def numerical_gradient(theta1, theta2, angles_rad):
 
     return num_grad
 
+def DEG2RAD(angle):
+    return np.pi * angle / 180
+
+def RAD2DEG(angle_rad):
+    return 180 * angle_rad / np.pi
+
+def read_angles(fliptable):
+    f = open(fliptable, 'r')
+    angles = []
+    for line in f.readlines():
+        angles.append(float(line))
+    return np.array(angles)
+
+
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
