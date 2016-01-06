@@ -147,22 +147,31 @@ if __name__ == "__main__":
     TE = 5e-3
 
     if len(sys.argv) > 1:
-        N = int(sys.argv[1])
+        T = int(sys.argv[1])
     else:
-        N = 10
+        T = 10
 
-    angles = 120 * np.ones((N,))
-    angles_rad = angles * pi / 180.
+    angles = 150 * np.ones((T,))
+    angles = read_angles('../data/flipangles.txt.408183520')
+
+    T2 = len(angles)
+    if T2 < T:
+        T = T2
+    else:
+        angles = angles[:T]
+
+    angles_rad = DEG2RAD(angles)
 
     S = epg.FSE_signal(angles_rad, TE, T1, T2)
     S2 = abs(S)
 
-    theta1 = {'T1': 1000e-3, 'T2': 200e-3}
-    theta2 = {'T1': 1000e-3, 'T2': 500e-3}
+    theta1 = {'T1': 1000e-3, 'T2': 20e-3}
+    theta2 = {'T1': 1000e-3, 'T2': 100e-3}
+
     t1 = time.time()
-    NG = numerical_gradient(theta1, theta2, angles_rad[:N])
+    NG = numerical_gradient(theta1, theta2, angles_rad[:T])
     t2 = time.time()
-    LP = loss_prime(theta1, theta2, angles_rad[:N])
+    LP = loss_prime(theta1, theta2, angles_rad[:T])
     t3 = time.time()
 
     NG_time = t2 - t1
@@ -174,10 +183,26 @@ if __name__ == "__main__":
     print
     print 'Error:', np.linalg.norm(NG - LP) / np.linalg.norm(NG)
 
-    plt.plot(TE*1000*np.arange(1, N+1), S2)
+    plt.plot(TE*1000*np.arange(1, T+1), S2)
     plt.xlabel('time (ms)')
     plt.ylabel('signal')
     plt.title('T1 = %.2f ms, T2 = %.2f ms' % (T1 * 1000, T2 * 1000))
     plt.show()
-    
 
+    tau = .2
+    nitr = 500
+    vals = np.zeros((nitr,))
+
+    a = angles_rad
+    a = np.pi * np.ones((T,))
+    a = np.random.rand(T) * np.pi
+
+    MAX_ANGLE = DEG2RAD(120)
+    MIN_ANGLE = DEG2RAD(50)
+
+    for i in range(500):
+        a = a + tau * loss_prime(theta1, theta2, a)
+        vals[i] = loss(theta1, theta2, a)
+        a[a < MIN_ANGLE] = MIN_ANGLE
+        a[a > MAX_ANGLE] = MAX_ANGLE
+        print i, vals[i], RAD2DEG(a)
