@@ -48,6 +48,17 @@ def loss(theta1, theta2, angles_rad):
 
     return 0.5 * np.linalg.norm(x1, ord=2)**2 + 0.5 * np.linalg.norm(x2, ord=2)**2 - np.dot(x1.ravel(), x2.ravel())
 
+def normalized_loss(theta1, theta2, angles_rad):
+    x1 = epg.FSE_signal(angles_rad, TE, theta1['T1'], theta1['T2'])
+    x2 = epg.FSE_signal(angles_rad, TE, theta2['T1'], theta2['T2'])
+
+    x1 = x1 / np.linalg.norm(x1, ord=2)
+    x2 = x2 / np.linalg.norm(x2, ord=2)
+
+    return - np.dot(x1.ravel(), x2.ravel())
+
+    
+
 
 def loss_prime(theta1, theta2, angles_rad):
     x1 = epg.FSE_signal(angles_rad, TE, theta1['T1'], theta1['T2']).ravel()
