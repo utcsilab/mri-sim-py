@@ -243,7 +243,7 @@ def FSE_signal2(angles_rad, TE, T1, T2):
         P = FSE_TE(P, alpha, TE, T1, T2)
 
         Mxy[i] = P[0,0]
-        Mz[i] = P[0,2]
+        Mz[i] = P[2,0]
 
     return Mxy, Mz
 
