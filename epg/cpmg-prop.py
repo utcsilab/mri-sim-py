@@ -6,51 +6,93 @@ from warnings import warn
 import epgcpmg as epg
 import time
 import sys
+import scipy.io
 
 
 class PulseTrain:
-    def __init__(self, T, TE, loss_fun, loss_fun_prime, angles_rad=None):
+    def __init__(self, state_file, T, TE, TR, loss_fun, loss_fun_prime, angles_rad=None, verbose=False, step=.01, max_iter=100):
+        self.state_file = state_file
         self.T = T
         self.TE = TE
+        self.TR = TR
         self.loss_fun = loss_fun
         self.loss_fun_prime = loss_fun_prime
-        if angles_rad is None:
-            self.angles_rad = angles_rad
+        self.max_iter = max_iter
+        self.step = step
+        self.verbose = verbose
+
+        self.reset()
+        if angles_rad is not None:
+            self.set_angles_rad(angles_rad)
+
+    def set_angles_rad(self, angles_rad):
+        T = len(angles_rad)
+        if T < self.T:
+            self.angles_rad = np.hstack((angles_rad, np.zeros((self.T-T))))
         else:
-            self.reset()
+            self.angles_rad = angles_rad[:self.T]
 
     def reset(self):
-        self.angles_rad = pi / 180 * (50 + (120 - 50) * np.random.rand(self.T))
+        self.angles_rad = DEG2RAD(50 + (120 - 50) * np.random.rand(self.T))
+        self.loss = []
 
-    def forward(self, theta):
-        T = self.T
-        P = np.zeros((self.T, 3, 2 * T + 1))
+    def save_state(self, filename=None):
+        state = {
+                'angles_rad': self.angles_rad,
+                'loss': self.loss,
+                'max_iter': self.max_iter,
+                'step': self.step,
+                'T': self.T,
+                'TE': self.TE,
+                'verbose': self.verbose,
+                }
+        if filename is None:
+            scipy.io.savemat(self.state_file, state, appendmat=False)
+        else:
+            scipy.io.savemat(filename, state, appendmat=False)
 
-        P0= np.hstack((np.array([[1],[1],[0.]]), np.zeros((3, 2 * T)))) # initial tip
+    def load_state(self, filename=None):
+        if filename is None:
+            state = scipy.io.loadmat(self.state_file)
+        else:
+            state = scipy.io.loadmat(filename)
 
-        for i in range(T):
-            alpha = self.angles_rad[i]
-            T1 = theta['T1']
-            T2 = theta['T2']
-            TE = self.TE
+        self.angles_rad = state['angles_rad'].ravel()
+        self.loss = list(state['loss'].ravel())
+        self.max_iter = state['max_iter'].ravel()[0]
+        self.step = state['step'].ravel()[0]
+        self.T = state['T'].ravel()[0]
+        self.TE = state['TE'].ravel()[0]
+        self.verbose = state['verbose'].ravel()[0]
 
-            if i == 0:
-                P[0, :, :] = epg.FSE_TE(P0, alpha, T1, T2, TE, noadd=True)
-            else:
-                P[i, :, :] = epg.FSE_TE(P[i - 1, :, :], alpha, T1, T2, TE, noadd=True)
 
-        return P
-
+    def train(self, theta1, theta2):
+        for i in range(self.max_iter):
+            angles_prime = self.loss_fun_prime(theta1, theta2, self.angles_rad, self.TE, self.TR)
+            self.angles_rad = self.angles_rad + self.step * angles_prime
+            self.loss.append(self.loss_fun(theta1, theta2, self.angles_rad, self.TE, self.TR))
+            str = '%d\t%3.3f' % (i, self.loss[-1])
+            self.print_verbose(str)
 
 def loss(theta1, theta2, angles_rad):
     x1 = epg.FSE_signal(angles_rad, TE, theta1['T1'], theta1['T2'])
     x2 = epg.FSE_signal(angles_rad, TE, theta2['T1'], theta2['T2'])
+    def forward(self, theta):
+        return epg.FSE_signal(self.angles_rad, TE, theta['T1'], theta['T2']).ravel()
+
+
+def loss(theta1, theta2, angles_rad, TE, TR):
+    T = len(angles_rad)
+    
+    x1 = epg.FSE_signal(angles_rad, TE, theta1['T1'], theta1['T2']) * (1 - exp(-(TR - T * TE)/theta1['T1']))
+    x2 = epg.FSE_signal(angles_rad, TE, theta2['T1'], theta2['T2']) * (1 - exp(-(TR - T * TE)/theta2['T1'])) 
 
     return 0.5 * np.linalg.norm(x1, ord=2)**2 + 0.5 * np.linalg.norm(x2, ord=2)**2 - np.dot(x1.ravel(), x2.ravel())
 
-def normalized_loss(theta1, theta2, angles_rad):
-    x1 = epg.FSE_signal(angles_rad, TE, theta1['T1'], theta1['T2'])
-    x2 = epg.FSE_signal(angles_rad, TE, theta2['T1'], theta2['T2'])
+def normalized_loss(theta1, theta2, angles_rad, TE, TR):
+    T = len(angles_rad)
+    x1 = epg.FSE_signal(angles_rad, TE, theta1['T1'], theta1['T2']) * (1 - exp(-(TR - T * TE)/theta1['T1']))
+    x2 = epg.FSE_signal(angles_rad, TE, theta2['T1'], theta2['T2']) * (1 - exp(-(TR - T * TE)/theta2['T1']))
 
     x1 = x1 / np.linalg.norm(x1, ord=2)
     x2 = x2 / np.linalg.norm(x2, ord=2)
@@ -60,16 +102,17 @@ def normalized_loss(theta1, theta2, angles_rad):
     
 
 
-def loss_prime(theta1, theta2, angles_rad):
-    x1 = epg.FSE_signal(angles_rad, TE, theta1['T1'], theta1['T2']).ravel()
-    x2 = epg.FSE_signal(angles_rad, TE, theta2['T1'], theta2['T2']).ravel()
+def loss_prime(theta1, theta2, angles_rad, TE, TR):
+    T = len(angles_rad)
+    x1 = epg.FSE_signal(angles_rad, TE, theta1['T1'], theta1['T2']).ravel() * (1 - exp(-(TR - T * TE)/theta1['T1']))
+    x2 = epg.FSE_signal(angles_rad, TE, theta2['T1'], theta2['T2']).ravel() * (1 - exp(-(TR - T * TE)/theta2['T1']))
 
     T = len(angles_rad)
     alpha_prime = np.zeros((T,))
 
     for i in range(T):
-        x1_prime = sig_prime_i(theta1, angles_rad, i).ravel()
-        x2_prime = sig_prime_i(theta2, angles_rad, i).ravel()
+        x1_prime = sig_prime_i(theta1, angles_rad, i).ravel() * (1 - exp(-(TR - T * TE)/theta1['T1']))
+        x2_prime = sig_prime_i(theta2, angles_rad, i).ravel() * (1 - exp(-(TR - T * TE)/theta2['T1']))
         M1 = np.dot(x1, x1_prime)
         M2 = np.dot(x2, x2_prime)
         M3 = np.dot(x1, x2_prime)
@@ -106,7 +149,7 @@ def get_params(theta):
     return theta['T1'], theta['T2']
 
 
-def numerical_gradient(theta1, theta2, angles_rad):
+def numerical_gradient(theta1, theta2, angles_rad, TE, TR):
     initial_params = angles_rad
     num_grad = np.zeros(initial_params.shape)
     perturb = np.zeros(initial_params.shape)
@@ -114,8 +157,8 @@ def numerical_gradient(theta1, theta2, angles_rad):
 
     for p in range(len(initial_params)):
         perturb[p] = e
-        loss2 = loss(theta1, theta2, angles_rad + perturb)
-        loss1 = loss(theta1, theta2, angles_rad - perturb)
+        loss2 = loss(theta1, theta2, angles_rad + perturb, TE, TR)
+        loss1 = loss(theta1, theta2, angles_rad - perturb, TE, TR)
 
         num_grad[p] = (loss2 - loss1) / (2 * e)
 
@@ -145,6 +188,7 @@ if __name__ == "__main__":
     T2 = 200e-3
 
     TE = 5e-3
+    TR = 1.4
 
     if len(sys.argv) > 1:
         T = int(sys.argv[1])
@@ -154,9 +198,9 @@ if __name__ == "__main__":
     angles = 150 * np.ones((T,))
     angles = read_angles('../data/flipangles.txt.408183520')
 
-    T2 = len(angles)
-    if T2 < T:
-        T = T2
+    TT = len(angles)
+    if TT < T:
+        T = TT
     else:
         angles = angles[:T]
 
@@ -169,9 +213,9 @@ if __name__ == "__main__":
     theta2 = {'T1': 1000e-3, 'T2': 100e-3}
 
     t1 = time.time()
-    NG = numerical_gradient(theta1, theta2, angles_rad[:T])
+    NG = numerical_gradient(theta1, theta2, angles_rad, TE, TR)
     t2 = time.time()
-    LP = loss_prime(theta1, theta2, angles_rad[:T])
+    LP = loss_prime(theta1, theta2, angles_rad, TE, TR)
     t3 = time.time()
 
     NG_time = t2 - t1
