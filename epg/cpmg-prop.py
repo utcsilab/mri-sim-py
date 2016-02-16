@@ -74,9 +74,20 @@ class PulseTrain:
             str = '%d\t%3.3f' % (i, self.loss[-1])
             self.print_verbose(str)
 
-def loss(theta1, theta2, angles_rad):
-    x1 = epg.FSE_signal(angles_rad, TE, theta1['T1'], theta1['T2'])
-    x2 = epg.FSE_signal(angles_rad, TE, theta2['T1'], theta2['T2'])
+    def print_verbose(self, str):
+        if self.verbose:
+            print str, RAD2DEG(self.angles_rad)
+
+    def plot_vals(self, thetas):
+        plt.subplot(2,1,1)
+        plt.plot(range(self.T), RAD2DEG(self.angles_rad), 'o-')
+        plt.xlim((0,self.T))
+        plt.subplot(2,1,2)
+        for theta in thetas:
+            plt.plot(range(self.T), epg.FSE_signal(self.angles_rad, self.TE, theta['T1'], theta['T2']))
+        plt.xlim((0,self.T))
+        plt.ylim((0,1))
+
     def forward(self, theta):
         return epg.FSE_signal(self.angles_rad, TE, theta['T1'], theta['T2']).ravel()
 
@@ -179,15 +190,27 @@ def read_angles(fliptable):
         angles.append(float(line))
     return np.array(angles)
 
+def print_table(P1, P2, P3):
+    print
+    print '\tP1\tP2\tP3\nloss\t%3.3f\t%3.3f\t%3.3f\nnloss\t%3.3f\t%3.3f\t%3.3f\n' % (
+            loss(theta1, theta2, P1.angles_rad, TE, TR),
+            loss(theta1, theta2, P2.angles_rad, TE, TR),
+            loss(theta1, theta2, P3.angles_rad, TE, TR),
+            normalized_loss(theta1, theta2, P1.angles_rad, TE, TR),
+            normalized_loss(theta1, theta2, P2.angles_rad, TE, TR),
+            normalized_loss(theta1, theta2, P3.angles_rad, TE, TR)
+            )
+
 
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
+    np.set_printoptions(suppress=True, precision=3)
 
     T1 = 1000e-3
     T2 = 200e-3
 
-    TE = 5e-3
+    TE = 50e-3
     TR = 1.4
 
     if len(sys.argv) > 1:
@@ -227,26 +250,40 @@ if __name__ == "__main__":
     print
     print 'Error:', np.linalg.norm(NG - LP) / np.linalg.norm(NG)
 
-    plt.plot(TE*1000*np.arange(1, T+1), S2)
-    plt.xlabel('time (ms)')
-    plt.ylabel('signal')
-    plt.title('T1 = %.2f ms, T2 = %.2f ms' % (T1 * 1000, T2 * 1000))
-    plt.show()
+    #plt.plot(TE*1000*np.arange(1, T+1), S2)
+    #plt.xlabel('time (ms)')
+    #plt.ylabel('signal')
+    #plt.title('T1 = %.2f ms, T2 = %.2f ms' % (T1 * 1000, T2 * 1000))
+    #plt.show()
 
-    tau = .2
-    nitr = 500
-    vals = np.zeros((nitr,))
 
     a = angles_rad
-    a = np.pi * np.ones((T,))
-    a = np.random.rand(T) * np.pi
+    #a = np.pi * np.ones((T,))
+    a = None
+
+    P1 = PulseTrain('angles_rand.mat', T, TE, TR, loss, loss_prime, angles_rad=a, verbose=True)
+    #P1.load_state()
+    P2 = PulseTrain('angles_180.mat', T, TE, TR, loss, loss_prime, angles_rad=np.pi * np.ones((T,)), verbose=True)
+    P3 = PulseTrain('angles_vfa.mat', T, TE, TR, loss, loss_prime, angles_rad=angles_rad, verbose=True)
+
+    print_table(P1, P2, P3)
+    P1.train(theta1, theta2)
+    print_table(P1, P2, P3)
+
+    plt.figure(1)
+    plt.clf()
+    P1.plot_vals((theta1, theta2))
+
+    plt.figure(2)
+    plt.clf()
+    P2.plot_vals((theta1, theta2))
+
+    plt.figure(3)
+    plt.clf()
+    P3.plot_vals((theta1, theta2))
+
+    plt.show()
 
     MAX_ANGLE = DEG2RAD(120)
     MIN_ANGLE = DEG2RAD(50)
 
-    for i in range(500):
-        a = a + tau * loss_prime(theta1, theta2, a)
-        vals[i] = loss(theta1, theta2, a)
-        a[a < MIN_ANGLE] = MIN_ANGLE
-        a[a > MAX_ANGLE] = MAX_ANGLE
-        print i, vals[i], RAD2DEG(a)

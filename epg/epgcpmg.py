@@ -3,6 +3,7 @@
 # EPG CPMG simulation code, based off of Matlab scripts from Brian Hargreaves <bah@stanford.edu>
 # 2015 Jonathan Tamir <jtamir@eecs.berkeley.edu>
 
+from __future__ import division
 import numpy as np
 from numpy import pi, cos, sin, exp, conj
 from warnings import warn
@@ -26,14 +27,21 @@ def rf2(FpFmZ, alpha):
 
     """
 
-    # -- From Weigel at al, JMR 205(2010)276-285, Eq. 8.
+    # -- From Weigel at al, JMRI 41(2015)266-295, Eq. 21.
     
     if abs(alpha) > 2 * pi:
         warn('rf2: Flip angle should be in radians!')
 
-    RR = np.array([ [cos(alpha/2.)**2, sin(alpha/2.)**2, sin(alpha)],
-                    [sin(alpha/2.)**2, cos(alpha/2.)**2, -sin(alpha)],
-                    [-0.5 * sin(alpha), 0.5 * sin(alpha), cos(alpha)] ])
+    cosa2 = cos(alpha/2.)**2
+    sina2 = sin(alpha/2.)**2
+
+    cosa = cos(alpha)
+    sina = sin(alpha)
+
+    RR = np.array([ [cosa2, sina2, sina],
+                    [sina2, cosa2, -sina],
+                    [-0.5 * sina, 0.5 * sina, cosa] ])
+
 
     FpFmZ = np.dot(RR, FpFmZ)
 
@@ -182,8 +190,10 @@ def FSE_TE(FpFmZ, alpha, TE, T1, T2, noadd=False, recovery=True):
 
 
 def FSE_TE_prime(FpFmZ, alpha, TE, T1, T2, noadd=False, recovery=True):
-    """ Propagate EPG states through a full TE, i.e.
-    relax -> grad -> rf -> grad -> relax.
+    """ Gradient of EPG propagatopm pver a full TE, i.e.
+    relax -> grad -> rf_prime -> grad -> relax_hat,
+    where rf_prime is the derivative of the RF pulse matrix w.r.t. alpha,
+    and relax_hat  is the relaxation without longitudinal recovery
     Assumes CPMG condition, i.e. all states are real-valued.
 
     INPUT:
@@ -194,6 +204,7 @@ def FSE_TE_prime(FpFmZ, alpha, TE, T1, T2, noadd=False, recovery=True):
         noadd = True to NOT add any higher-order states - assume
                 that they just go to zero.  Be careful - this
                 speeds up simulations, but may compromise accuracy!
+        recovery = True to include T1 recovery in the Z0 state.
 
     OUTPUT:
         FpFmZ = updated F+, F- and Z states.
