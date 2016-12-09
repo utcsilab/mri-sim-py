@@ -188,6 +188,7 @@ def read_angles(fliptable):
     angles = []
     for line in f.readlines():
         angles.append(float(line))
+    f.close()
     return np.array(angles)
 
 def print_table(P1, P2, P3):
