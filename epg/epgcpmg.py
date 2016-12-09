@@ -89,6 +89,35 @@ def relax_mat(T, T1, T2):
 
     return EE
 
+def relax_mat_prime_T1(T, T1, T2):
+    E1_prime_T1 = T * exp(-T/T1) / T1**2
+    return np.diag([0, 0, E1_prime_T1])
+
+def relax_mat_prime_T2(T, T1, T2):
+    E2_prime_T2 = T * exp(-T/T2) / T2**2
+    return np.diag([E2_prime_T2, E2_prime_T2, 0])
+
+
+def relax_prime_T1(FpFmZ, T, T1, T2):
+    """returns E'(T1) FpFmZ + E0'(T1)"""
+    
+    EE_prime_T1 = relax_mat_prime_T1(T, T1, T2)
+    
+    RR = -EE_prime_T1[2,2]
+    
+    FpFmZ = np.dot(EE_prime_T1, FpFmZ)
+    FpFmZ[2,0] = FpFmZ[2,0] + RR
+    
+    return FpFmZ
+
+def relax_prime_T2(FpFmZ, T, T1, T2):
+    """returns E'(T2) FpFmZ"""
+    
+    EE_prime_T2 = relax_mat_prime_T2(T, T1, T2)
+    FpFmZ = np.dot(EE_prime_T2, FpFmZ)
+    
+    return FpFmZ
+
 
 def relax(FpFmZ, T, T1, T2):
     """Same as relax2, but only returns FpFmZ"""
@@ -220,6 +249,64 @@ def FSE_TE_prime_alpha(FpFmZ, alpha, TE, T1, T2, noadd=False, recovery=True):
     return FpFmZ
 
 
+def FSE_TE_prime1_T2(FpFmZ, alpha, TE, T1, T2, noadd=False):
+    """ Returns E(T2) G R G E'(T2) FpFmZ"""
+    
+    EE = relax_mat(TE/2., T1, T2)
+    EE_prime = relax_mat_prime_T2(TE/2., T1, T2)
+
+    FpFmZ = np.dot(EE_prime, FpFmZ)    
+    FpFmZ = grad(FpFmZ, noadd)
+    FpFmZ = rf(FpFmZ, alpha)
+    FpFmZ = grad(FpFmZ, noadd)
+    FpFmZ = np.dot(EE, FpFmZ)
+    
+    return FpFmZ
+
+def FSE_TE_prime2_T2(FpFmZ, alpha, TE, T1, T2, noadd=False):
+    """ Returns E'(T2) G R G (E(T2) FpFmZ + E0)"""
+    
+    EE_prime = relax_mat_prime_T2(TE/2., T1, T2)
+    
+    FpFmZ = relax(FpFmZ, TE/2., T1, T2)
+    FpFmZ = grad(FpFmZ, noadd)
+    FpFmZ = rf(FpFmZ, alpha)
+    FpFmZ = grad(FpFmZ, noadd)
+    FpFmZ = np.dot(EE_prime, FpFmZ)
+    
+    return FpFmZ
+
+def FSE_TE_prime1_T1(FpFmZ, alpha, TE, T1, T2, noadd=False):
+    """ Returns E(T1) G R G (E'(T1) FpFmZ + E0'(T1))"""
+    
+    EE = relax_mat(TE/2., T1, T2)
+    
+    FpFmZ = relax_prime_T1(FpFmZ, TE/2., T1, T2) # E'(T1) FpFmZ + E0'(T1)
+    FpFmZ = grad(FpFmZ, noadd)
+    FpFmZ = rf(FpFmZ, alpha)
+    FpFmZ = grad(FpFmZ, noadd)
+    FpFmZ = np.dot(EE, FpFmZ)
+    
+    return FpFmZ
+
+def FSE_TE_prime2_T1(FpFmZ, alpha, TE, T1, T2, noadd=False):
+    """ Returns E'(T1) G R G E(T1) FpFmZ + E0'(T1)"""
+    
+    EE = relax_mat(TE/2., T1, T2)
+
+    FpFmZ = np.dot(EE, FpFmZ) 
+    FpFmZ = grad(FpFmZ, noadd)
+    FpFmZ = rf(FpFmZ, alpha)
+    FpFmZ = grad(FpFmZ, noadd)
+    FpFmZ = relax_prime_T1(FpFmZ, TE/2., T1, T2) # E'(T1) FpFmZ + E0'(T1)
+    
+    return FpFmZ
+
+
+
+### Gradients of full FSE EPG function across T time points
+
+
 def FSE_signal_prime_alpha_idx(angles_rad, TE, T1, T2, idx):
     """Gradient of EPG function at each time point w.r.t. RF pulse alpha_i"""
 
@@ -241,6 +328,61 @@ def FSE_signal_prime_alpha_idx(angles_rad, TE, T1, T2, idx):
             z_prime[i] = wi[0,0]
 
     return z_prime
+
+
+def FSE_signal_prime_T1(angles_rad, TE, T1, T2):
+    """Gradient of EPG function at each time point w.r.t. T1"""
+    
+    T = len(angles_rad)
+    
+    zi = np.hstack((np.array([[1],[1],[0]]), np.zeros((3, T))))
+    z_prime = np.zeros((T, 1))
+    
+    for i in range(T):
+        
+        alpha = angles_rad[i]
+
+        if i == 0:
+            wi = np.zeros((3, T+1))
+        else:
+            wi = FSE_TE(wi, alpha, TE, T1, T2, noadd=True, recovery=False)
+            
+        wi += FSE_TE_prime1_T1(zi, alpha, TE, T1, T2, noadd=True)
+        wi += FSE_TE_prime2_T1(zi, alpha, TE, T1, T2, noadd=True)
+
+        zi = FSE_TE(zi, alpha, TE, T1, T2, noadd=True)
+        z_prime[i] = wi[0,0]
+
+    return z_prime
+
+
+def FSE_signal_prime_T2(angles_rad, TE, T1, T2):
+    """Gradient of EPG function at each time point w.r.t. T2"""
+    
+    T = len(angles_rad)
+    
+    zi = np.hstack((np.array([[1],[1],[0]]), np.zeros((3, T))))
+    z_prime = np.zeros((T, 1))
+    
+    for i in range(T):
+      
+        alpha = angles_rad[i]
+
+        if i == 0:
+            wi = np.zeros((3, T+1))
+        else:
+            wi = FSE_TE(wi, alpha, TE, T1, T2, noadd=True, recovery=False)
+
+        wi += FSE_TE_prime1_T2(zi, alpha, TE, T1, T2, noadd=True)
+        wi += FSE_TE_prime2_T2(zi, alpha, TE, T1, T2, noadd=True)
+        
+        zi = FSE_TE(zi, alpha, TE, T1, T2, noadd=True)
+        z_prime[i] = wi[0,0]
+
+    return z_prime
+
+
+### Full FSE EPG function across T time points
 
 def FSE_signal(angles_rad, TE, T1, T2):
     """Same as FSE_signal2, but only returns Mxy"""
