@@ -122,8 +122,8 @@ def loss_prime(theta1, theta2, angles_rad, TE, TR):
     alpha_prime = np.zeros((T,))
 
     for i in range(T):
-        x1_prime = sig_prime_i(theta1, angles_rad, i).ravel() * (1 - exp(-(TR - T * TE)/theta1['T1']))
-        x2_prime = sig_prime_i(theta2, angles_rad, i).ravel() * (1 - exp(-(TR - T * TE)/theta2['T1']))
+        x1_prime = epg.FSE_signal_prime_alpha_idx(angles_rad, TE, theta1['T1'], theta1['T2'], i).ravel() * (1 - exp(-(TR - T * TE)/theta1['T1']))
+        x2_prime = epg.FSE_signal_prime_alpha_idx(angles_rad, TE, theta2['T1'], theta2['T2'], i).ravel() * (1 - exp(-(TR - T * TE)/theta2['T1']))
         M1 = np.dot(x1, x1_prime)
         M2 = np.dot(x2, x2_prime)
         M3 = np.dot(x1, x2_prime)
@@ -132,28 +132,6 @@ def loss_prime(theta1, theta2, angles_rad, TE, TR):
         alpha_prime[i] = M1 + M2 - M3 - M4
 
     return alpha_prime
-
-
-def sig_prime_i(theta, angles_rad, idx):
-    T1, T2 = get_params(theta)
-    T = len(angles_rad)
-    zi = np.hstack((np.array([[1],[1],[0]]), np.zeros((3, T))))
-
-    z_prime = np.zeros((T, 1))
-
-    for i in range(T):
-        alpha = angles_rad[i]
-        if i < idx:
-            zi = epg.FSE_TE(zi, alpha, TE, T1, T2, noadd=True)
-            z_prime[i] = 0
-        elif i == idx:
-            wi = epg.FSE_TE_prime(zi, alpha, TE, T1, T2, noadd=True)
-            z_prime[i] = wi[0,0]
-        else:
-            wi = epg.FSE_TE(wi, alpha, TE, T1, T2, noadd=True, recovery=False)
-            z_prime[i] = wi[0,0]
-
-    return z_prime
 
 
 def get_params(theta):
