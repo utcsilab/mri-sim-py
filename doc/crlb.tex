@@ -77,7 +77,7 @@ The Fisher Information Matrix (FIM) consists of the following six terms:
   \label{eqn:FIM}
 \end{align}
 
-For ease of notation, a function $f(x,y,z)$ will be referred to as $f(x)$ when it is understood that the other parameter
+For ease of notation, a function $f(x,y,z)$ will be referred to as $f(x)$ when it is understood that the other parameters
 are constants in the expression. Also, the partial derivative of a function $f(x,y,z)$ w.r.t.\ parameter $x$ will be denoted by $f'(x)$.
 We have
 \begin{align}
@@ -96,8 +96,7 @@ We have
 \end{align}
 
 The inverse of the FIM is a lower bound on the covariance matrix of an unbiased estimator of the parameters $\veca{\theta}=(T_1, T_2, M_r)$.
-Thus it reasons to minimize some metric of sub-matrix of $\vec I$.
-
+Thus it reasons to minimize some metric of sub-matrix of $\vec I^{-1}$.
 Group the FIM into
 \begin{align}
   \vec I &= \begin{bmatrix}
@@ -105,7 +104,53 @@ Group the FIM into
   \end{bmatrix}
   \label{eqn:FIMd}
 \end{align}
-where $\vec I_{11}$ represents the $2\times 2$ submatrix. Then the Schur complement of $\vec I$ w.r.t.\ $\vec I_{22}$ is
+where $\vec I_{11}$ represents the $2\times 2$ sub-matrix. Then the Schur complement of $\vec I$ w.r.t.\ $\vec I_{22}$ is
+
+\section{EPG Function}
+The EPG function is a recursive function of the signal magnetization and refocusing flip angles. For $T$ refocusing pulses, the EPG
+function $\vec f : \RR_+^2 \rightarrow \RR_+^T$ is
+\begin{align}
+  \vec f(T_1, T_2, \theta_1^T) = \begin{bmatrix} f_1 & \cdots & f_T \end{bmatrix}^T.
+  \label{eqn:epgvec}
+\end{align}
+
+Let the magnetization state after the $\nth{i}$ refocusing pulse be $\vec s_i \in \CC^{3(T+1)}$. The first entry of $\vec s_i$ represents the
+coherent transverse magnetization, $M_{xy}$, and the third entry represents the coherent longitudinal magnetization, $M_z$. The observed
+signal after the $\nth{i}$ pulse is then
+\begin{align}
+  f_i(T_1, T_2, \theta_1^i) &= \begin{bmatrix}1 & 0 & 0 & \cdots & 0 \end{bmatrix} \vec s_i(T_1, T_2, \theta_1^i)
+  \label{eqn:epgrec}
+\end{align}
+The initial magnetization state (after the 90 degree excitation pulse) is given by 
+\begin{align}
+  \vec s_0 &= \mathrm{vec}\left(\begin{bmatrix}
+    1 & 0 & 0 & \cdots & 0 \\
+    1 & 0 & 0 & \cdots & 0 \\
+    0 & 0 & 0 & \cdots & 0 
+\end{bmatrix}\right).
+  \label{eqn:s0}
+\end{align}
+One progression of the EPG states is given by
+\begin{align}
+  \vec s_i & = \vec E \left(\vec G \vec R_i\vec{GE}\vec s_{i-1} + \vec E_0 \right) + \vec E_0,
+  \label{eqn:skrec}
+\end{align}
+where $\vec E$, $\vec E_0$, $\vec G$, and $\vec R_i$ are defined in the conventional way for EPG.
+Thus,
+\begin{align}
+  \begin{split}
+    \nabla\vec s_i(T_1) &= \nabla\vec E(T_1)\left(\vec{GR}_i \vec{GE}(T_1)\vec s_{i-1}(T_1) + \vec E_0(T_1)\right)  \\
+    &+ \vec E(T_1)\left(\vec{GR}_i \vec{G}\left(\nabla\vec E(T_1)\vec s_{i-1}(T_1) + \vec E(T_1)\nabla\vec s_{i-1}(T_1)\right) + \nabla\vec E_0(T_1)\right)
+    + \nabla\vec E_0(T_1),
+  \end{split}
+  \label{eqn:dsdT1} \\
+  \begin{split}
+  \nabla\vec s_i(T_2) &= \nabla\vec E(T_2)\vec{GR}_i \vec{G}\left(\vec E(T_2)\vec s_{i-1}(T_2) + \vec E_0\right) \\
+  &+ \vec E(T_2)\left(\vec{GR}_i \vec{G}\left(\nabla\vec E(T_2)\vec s_{i-1}(T_2) + \vec E(T_2)\nabla\vec s_{i-1}(T_2)\right)\right).
+  \end{split}
+  \label{eqn:dsdT2}
+\end{align}
+
 
 \end{document}
 
