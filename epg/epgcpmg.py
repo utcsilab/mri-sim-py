@@ -47,6 +47,42 @@ def rf2(FpFmZ, alpha):
 
     return FpFmZ, RR
 
+def rf_ex(FpFmZ, alpha):
+    "Same as rf2_ex, but only returns FpFmZ"""
+    return rf2_ex(FpFmZ, alpha)[0]
+
+def rf2_ex(FpFmZ, alpha):
+    """ Propagate EPG states through an RF excitation of 
+    alpha (radians) along the y direction, i.e. phase of pi/2.
+
+    INPUT:
+        FpFmZ = 3xN vector of F+, F- and Z states.
+        alpha = RF pulse flip angle in radians
+
+    OUTPUT:
+        FpFmZ = Updated FpFmZ state.
+        RR = RF rotation matrix (3x3).
+
+    """
+
+    if abs(alpha) > 2 * pi:
+        warn('rf2_ex: Flip angle should be in radians!')
+
+    cosa2 = cos(alpha/2.)**2
+    sina2 = sin(alpha/2.)**2
+
+    cosa = cos(alpha)
+    sina = sin(alpha)
+
+    RR = np.array([ [cosa2, -sina2, sina],
+                    [-sina2, cosa2, sina],
+                    [-0.5 * sina, -0.5 * sina, cosa] ])
+
+
+    FpFmZ = np.dot(RR, FpFmZ)
+
+    return FpFmZ, RR
+
 
 
 def rf_prime(FpFmZ, alpha):
@@ -384,14 +420,25 @@ def FSE_signal_prime_T2(angles_rad, TE, T1, T2):
 
 ### Full FSE EPG function across T time points
 
+
+def FSE_signal_ex(angle_ex_rad, angles_rad, TE, T1, T2):
+    return FSE_signal2_ex(angle_ex_rad, angles_rad, TE, T1, T2)[0]
+
 def FSE_signal(angles_rad, TE, T1, T2):
     """Same as FSE_signal2, but only returns Mxy"""
+
     return FSE_signal2(angles_rad, TE, T1, T2)[0]
 
 def FSE_signal2(angles_rad, TE, T1, T2):
+    """Same as FSE_signal2_ex, but assumes excitation pulse is 90 degrees"""
+
+    return FSE_signal2_ex(np.pi/2., angles_rad, TE, T1, T2)
+
+
+def FSE_signal2_ex(angle_ex_rad, angles_rad, TE, T1, T2):
     """Simulate Fast Spin-Echo CPMG sequence with specific flip angle train.
-    Prior to the flip angle train, a 90 degree pulse is applied in the Y direction.
-    The flip angle train is then applied in the X direction.
+    Prior to the flip angle train, an excitation pulse of angle_ex_rad degrees
+    is applied in the Y direction. The flip angle train is then applied in the X direction.
 
     INPUT:
         angles_rad = array of flip angles in radians equal to echo train length
@@ -409,7 +456,9 @@ def FSE_signal2(angles_rad, TE, T1, T2):
     Mxy = np.zeros((T,1))
     Mz = np.zeros((T,1))
 
-    P = np.array([[1],[1],[0]])  # initial tip
+    P = np.aray([[0],[0],[1]]) # initially on Mz
+
+    P = rf_ex(P, angle_ex_rad) # initial tip
 
 
     for i in range(T):
