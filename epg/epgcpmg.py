@@ -456,7 +456,7 @@ def FSE_signal2_ex(angle_ex_rad, angles_rad, TE, T1, T2):
     Mxy = np.zeros((T,1))
     Mz = np.zeros((T,1))
 
-    P = np.aray([[0],[0],[1]]) # initially on Mz
+    P = np.array([[0],[0],[1]]) # initially on Mz
 
     P = rf_ex(P, angle_ex_rad) # initial tip
 
