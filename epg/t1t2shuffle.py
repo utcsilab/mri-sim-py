@@ -15,17 +15,24 @@ def T1_recovery_prime(T, T1):
     return T * exp(-T/T1) / T1**2
 
 def t1t2shuffle(angles_rad, TE, TRs, M0, T1, T2):
+    """T1-T2 Shuffling signal equation: 3DFSE with driven equillibrium"""
+
+    return t1t2shuffle_ex(pi/2., angles_rad, TE, TRs, M0, T1, T2)
+
+def t1t2shuffle_ex(angle_ex_rad, angles_rad, TE, TRs, M0, T1, T2):
+    """Same as t1t2shuffle, with arbitrary RF exciation flip angle"""
 
     T = angles_rad.size
 
     URs = TRs - (T+1)*TE # T + 1 to account for fast recovery
 
-    fi = epg.FSE_signal(angles_rad, TE, T1, T2)
+    fi = epg.FSE_signal_ex(angle_ex_rad, angles_rad, TE, T1, T2)
     Ej = T1_recovery(URs, T1)[None,:]
 
     sig = M0 * fi * (1 - Ej) / (1 - fi[-1]*Ej)
     
     return sig.ravel(order='F')
+
     
 def t1t2shuffle_prime_T2(angles_rad, TE, TRs, M0, T1, T2):
     """derivative of signal equation w.r.t. T2"""
