@@ -422,6 +422,7 @@ def FSE_signal_prime_T2(angles_rad, TE, T1, T2):
 
 
 def FSE_signal_ex(angle_ex_rad, angles_rad, TE, T1, T2):
+    """Same as FSE_signal2_ex, but only returns Mxy"""
     return FSE_signal2_ex(angle_ex_rad, angles_rad, TE, T1, T2)[0]
 
 def FSE_signal(angles_rad, TE, T1, T2):
@@ -432,7 +433,7 @@ def FSE_signal(angles_rad, TE, T1, T2):
 def FSE_signal2(angles_rad, TE, T1, T2):
     """Same as FSE_signal2_ex, but assumes excitation pulse is 90 degrees"""
 
-    return FSE_signal2_ex(np.pi/2., angles_rad, TE, T1, T2)
+    return FSE_signal2_ex(pi/2., angles_rad, TE, T1, T2)
 
 
 def FSE_signal2_ex(angle_ex_rad, angles_rad, TE, T1, T2):
