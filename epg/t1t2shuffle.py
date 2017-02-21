@@ -72,3 +72,22 @@ def t1t2shuffle_prime_M0(angles_rad, TE, TRs, M0, T1, T2):
     
     return t1t2shuffle(angles_rad, TE, TRs, 1., T1, T2)
     
+
+def t1t2shuffle_prime_alpha_idx(angles_rad, TE, TRs, M0, T1, T2, idx):
+    """derivative of signal equation w.r.t. the i'th flip angle"""
+
+    T = angles_rad.size
+
+    URs = TRs - (T+1)*TE # T + 1 to account for fast recovery
+
+    fi = epg.FSE_signal(angles_rad, TE, T1, T2)
+    fi_prime = epg.FSE_signal_prime_alpha_idx(angles_rad, TE, T1, T2, idx)
+
+    Ej = T1_recovery(URs, T1)[None,:] 
+
+    a = 1 - Ej
+    b = 1 - Ej * fi[-1]
+
+    sig_prime = M0 * a / b**2 * (fi_prime * b + fi * Ej * fi_prime[-1])
+    
+    return sig_prime.ravel(order='F')
