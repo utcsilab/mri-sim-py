@@ -122,6 +122,69 @@ def rf_prime2(FpFmZ, alpha):
     return FpFmZ, RR
 
 
+def rf_B1_prime(FpFmZ, alpha, B1):
+    """Same as rf_B1_prime2, but only returns FpFmZ"""
+    return rf_B1_prime2(FpFmZ, alpha, B1)[0]
+
+def rf_B1_prime2(FpFmZ, alpha, B1):
+    """ Compute the gradient of B1 inhomogeneity w.r.t. RF refocusing operator, where
+    alpha (radians) is the RF rotation and B1 is the B1 homogeneity (0, 2).
+    Assumes CPMG condition, i.e. magnetization lies on the real x axis.
+
+    INPUT:
+        FpFmZ = 3xN vector of F+, F- and Z states.
+        alpha = RF pulse flip angle in radians
+        B1 = B1 Homogeneity, where 1. is homogeneous
+
+    OUTPUT:
+        FpFmZ = Derivative of FpFmZ state w.r.t. alpha
+        RR = Derivative of RF rotation matrix (3x3) w.r.t. B1
+
+    """
+
+    if abs(alpha) > 2 * pi:
+        warn('rf_B1_prime2: Flip angle should be in radians! alpha=%f' % alpha)
+
+    if B1 < 0 or B1 > 2:
+        warn('rf_B1_prime2: B1 Homogeneity should be a percentage between (0, 2)')
+
+    RR = np.array([ [-alpha*cos(B1*alpha/2.) * sin(B1*alpha/2.), alpha*cos(B1*alpha/2.) * sin(B1*alpha/2.), alpha*cos(B1*alpha)],
+                    [alpha*cos(B1*alpha/2.) * sin(B1*alpha/2.), -alpha*cos(B1*alpha/2.) * sin(B1*alpha/2.), -alpha*cos(B1*alpha)],
+                    [-0.5*alpha*cos(B1*alpha), 0.5*alpha*cos(B1*alpha), -alpha*sin(B1*alpha)] ])
+
+    FpFmZ = np.dot(RR, FpFmZ)
+
+    return FpFmZ, RR
+
+
+def rf_ex_B1_prime(FpFmZ, alpha, B1):
+    """Gradient of B1 inhomogeneity w.r.t. RF excitation operator, where
+    alpha (radians) is the RF rotation and B1 is the B1 honogeneity (0, 2).
+    Assumes CPMG condition, i.e. RF excitation in the y direction.
+
+    INPUT:
+        FpFmZ = 3xN vector of F+, F- and Z states.
+        alpha = RF pulse flip angle in radians
+        B1 = B1 Homogeneity, where 1. is homogeneous
+
+    OUTPUT:
+        FpFmZ = Derivative of FpFmZ state w.r.t. alpha
+    """
+
+    if abs(alpha) > 2 * pi:
+        warn('rf_ex_B1_prime2: Flip angle should be in radians! alpha=%f' % alpha)
+
+    if B1 < 0 or B1 > 2:
+        warn('rf_ex_B1_prime: B1 Homogeneity should be a percentage between (0, 2)')
+
+    RR = np.array([ [-alpha*cos(B1*alpha/2.) * sin(B1*alpha/2.), alpha*cos(B1*alpha/2.) * sin(B1*alpha/2.), alpha*cos(B1*alpha)],
+                    [alpha*cos(B1*alpha/2.) * sin(B1*alpha/2.), -alpha*cos(B1*alpha/2.) * sin(B1*alpha/2.), alpha*cos(B1*alpha)],
+                    [-0.5*alpha*cos(B1*alpha), -0.5*alpha*cos(B1*alpha), -alpha*sin(B1*alpha)] ])
+
+    FpFmZ = np.dot(RR, FpFmZ)
+
+    return FpFmZ
+
 
 def relax_mat(T, T1, T2):
     E2 = exp(-T/T2)
@@ -345,6 +408,38 @@ def FSE_TE_prime2_T1(FpFmZ, alpha, TE, T1, T2, noadd=False):
     return FpFmZ
 
 
+def FSE_TE_prime_B1(FpFmZ, alpha, TE, T1, T2, B1, noadd=False):
+    """ Gradient of EPG over a full TE, w.r.t. B1 homogeneity fraciton B1, i.e.
+    relax -> grad -> rf_B1_prime -> grad -> relax_hat,
+    where rf_B1_prime is the derivative of the RF pulse matrix w.r.t. B1,
+    and relax_hat  is the relaxation without longitudinal recovery
+    Assumes CPMG condition, i.e. all states are real-valued.
+
+    INPUT:
+        FpFmZ = 3xN vector of F+, F- and Z states.
+        alpha = RF pulse flip angle in radians
+        T1, T2 = Relaxation times (same as TE)
+        TE = Echo Time interval (same as T1, T2)
+        B1 = fraction of B1 homogeneity (1 is fully homogeneous)
+        noadd = True to NOT add any higher-order states - assume
+                that they just go to zero.  Be careful - this
+                speeds up simulations, but may compromise accuracy!
+        recovery = True to include T1 recovery in the Z0 state.
+
+    OUTPUT:
+        FpFmZ = updated F+, F- and Z states.
+
+   """
+
+    FpFmZ, EE = relax2(FpFmZ, TE/2., T1, T2)
+    FpFmZ = grad(FpFmZ, noadd)
+    FpFmZ = rf_B1_prime(FpFmZ, alpha, B1)
+    FpFmZ = grad(FpFmZ, noadd)
+    FpFmZ = np.dot(EE, FpFmZ)
+
+    return FpFmZ
+
+
 
 ### Gradients of full FSE EPG function across T time points
 
@@ -373,11 +468,23 @@ def FSE_signal_prime_alpha_idx(angles_rad, TE, T1, T2, idx):
 
 
 def FSE_signal_prime_T1(angles_rad, TE, T1, T2):
+    return FSE_signal_ex_prime_T1(np.pi/2, angles_rad, TE, T1, T2)
+
+def FSE_signal_ex_prime_T1(angle_ex_rad, angles_rad, TE, T1, T2, B1=1.):
     """Gradient of EPG function at each time point w.r.t. T1"""
     
     T = len(angles_rad)
+
+    try:
+        B1 = B1[0]
+    except:
+        pass
+
+    # since the grad doesn't depend on B1 inhomog, can just pre-scale flip angles
+    angle_ex_rad = B1 * np.copy(angle_ex_rad)
+    angles_rad = B1 * np.copy(angles_rad)
     
-    zi = np.hstack((np.array([[1],[1],[0]]), np.zeros((3, T))))
+    zi = np.hstack((rf_ex(np.array([[0],[0],[1]]), angle_ex_rad), np.zeros((3, T))))
     z_prime = np.zeros((T, 1))
     
     for i in range(T):
@@ -399,13 +506,25 @@ def FSE_signal_prime_T1(angles_rad, TE, T1, T2):
 
 
 def FSE_signal_prime_T2(angles_rad, TE, T1, T2):
+    return FSE_signal_ex_prime_T2(np.pi/2, angles_rad, TE, T1, T2)
+
+def FSE_signal_ex_prime_T2(angle_ex_rad, angles_rad, TE, T1, T2, B1=1.):
     """Gradient of EPG function at each time point w.r.t. T2"""
     
     T = len(angles_rad)
+
+    try:
+        B1 = B1[0]
+    except:
+        pass
+
+    # since the grad doesn't depend on B1 inhomog, can just pre-scale flip angles
+    angle_ex_rad = B1 * np.copy(angle_ex_rad)
+    angles_rad = B1 * np.copy(angles_rad)
     
-    zi = np.hstack((np.array([[1],[1],[0]]), np.zeros((3, T))))
+    zi = np.hstack((rf_ex(np.array([[0],[0],[1]]), angle_ex_rad), np.zeros((3, T))))
     z_prime = np.zeros((T, 1))
-    
+
     for i in range(T):
       
         alpha = angles_rad[i]
@@ -424,12 +543,43 @@ def FSE_signal_prime_T2(angles_rad, TE, T1, T2):
     return z_prime
 
 
+def FSE_signal_ex_prime_B1(angle_ex_rad, angles_rad, TE, T1, T2, B1):
+    """Gradient of EPG function at each time point w.r.t. B1 Homogeneity.
+    Includes the excitation flip angle"""
+    
+    T = len(angles_rad)
+    zi = np.hstack((np.array([[0],[0],[1]]), np.zeros((3, T+1))))
+
+    z_prime = np.zeros((T, 1))
+
+    wi = rf_ex_B1_prime(zi, angle_ex_rad, B1)
+    zi = rf_ex(zi, angle_ex_rad * B1)
+
+    for i in range(T):
+
+        alpha = angles_rad[i]
+
+        if i == 0:
+            xi = FSE_TE(wi, alpha * B1, TE, T1, T2, noadd=True, recovery=False)
+        else:
+            xi = FSE_TE(wi, alpha * B1, TE, T1, T2, noadd=True)
+
+        wi = FSE_TE_prime_B1(zi, alpha, TE, T1, T2, B1, noadd=True) + xi
+
+        zi = FSE_TE(zi, alpha * B1, TE, T1, T2, noadd=True)
+
+        z_prime[i] = wi[0,0]
+
+    return z_prime
+
+
+
 ### Full FSE EPG function across T time points
 
 
-def FSE_signal_ex(angle_ex_rad, angles_rad, TE, T1, T2):
+def FSE_signal_ex(angle_ex_rad, angles_rad, TE, T1, T2, B1=1.):
     """Same as FSE_signal2_ex, but only returns Mxy"""
-    return FSE_signal2_ex(angle_ex_rad, angles_rad, TE, T1, T2)[0]
+    return FSE_signal2_ex(angle_ex_rad, angles_rad, TE, T1, T2, B1)[0]
 
 def FSE_signal(angles_rad, TE, T1, T2):
     """Same as FSE_signal2, but only returns Mxy"""
@@ -442,7 +592,7 @@ def FSE_signal2(angles_rad, TE, T1, T2):
     return FSE_signal2_ex(pi/2., angles_rad, TE, T1, T2)
 
 
-def FSE_signal2_ex(angle_ex_rad, angles_rad, TE, T1, T2):
+def FSE_signal2_ex(angle_ex_rad, angles_rad, TE, T1, T2, B1=1.):
     """Simulate Fast Spin-Echo CPMG sequence with specific flip angle train.
     Prior to the flip angle train, an excitation pulse of angle_ex_rad degrees
     is applied in the Y direction. The flip angle train is then applied in the X direction.
@@ -465,8 +615,16 @@ def FSE_signal2_ex(angle_ex_rad, angles_rad, TE, T1, T2):
 
     P = np.array([[0],[0],[1]]) # initially on Mz
 
-    P = rf_ex(P, angle_ex_rad) # initial tip
+    try:
+        B1 = B1[0]
+    except:
+        pass
 
+    # pre-scale by B1 homogeneity
+    angle_ex_rad = B1 * np.copy(angle_ex_rad)
+    angles_rad = B1 * np.copy(angles_rad)
+
+    P = rf_ex(P, angle_ex_rad) # initial tip
 
     for i in range(T):
         alpha = angles_rad[i]
