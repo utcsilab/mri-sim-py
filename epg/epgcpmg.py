@@ -28,9 +28,10 @@ def rf2(FpFmZ, alpha):
     """
 
     # -- From Weigel at al, JMRI 41(2015)266-295, Eq. 21.
+
     
     if abs(alpha) > 2 * pi:
-        warn('rf2: Flip angle should be in radians!')
+        warn('rf2: Flip angle should be in radians! alpha=%f' % alpha)
 
     cosa2 = cos(alpha/2.)**2
     sina2 = sin(alpha/2.)**2
@@ -65,8 +66,14 @@ def rf2_ex(FpFmZ, alpha):
 
     """
 
+    try:
+        alpha = alpha[0]
+    except:
+        pass
+
+
     if abs(alpha) > 2 * pi:
-        warn('rf2_ex: Flip angle should be in radians!')
+        warn('rf2_ex: Flip angle should be in radians! alpha=%f' % alpha)
 
     cosa2 = cos(alpha/2.)**2
     sina2 = sin(alpha/2.)**2
@@ -77,7 +84,6 @@ def rf2_ex(FpFmZ, alpha):
     RR = np.array([ [cosa2, -sina2, sina],
                     [-sina2, cosa2, sina],
                     [-0.5 * sina, -0.5 * sina, cosa] ])
-
 
     FpFmZ = np.dot(RR, FpFmZ)
 
@@ -105,7 +111,7 @@ def rf_prime2(FpFmZ, alpha):
     """
 
     if abs(alpha) > 2 * pi:
-        warn('rf2: Flip angle should be in radians!')
+        warn('rf_prime2: Flip angle should be in radians! alpha=%f' % alpha)
 
     RR = np.array([ [-cos(alpha/2.) * sin(alpha/2.), cos(alpha/2.) * sin(alpha/2.), cos(alpha)],
                     [cos(alpha/2.) * sin(alpha/2.), -cos(alpha/2.) * sin(alpha/2.), -cos(alpha)],
