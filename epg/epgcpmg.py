@@ -92,7 +92,7 @@ def rf2_ex(FpFmZ, alpha):
 
 
 def rf_prime(FpFmZ, alpha):
-    """Same as rf_prime, but only returns FpFmZ"""
+    """Same as rf_prime2, but only returns FpFmZ"""
     return rf_prime2(FpFmZ, alpha)[0]
 
 def rf_prime2(FpFmZ, alpha):
@@ -360,7 +360,7 @@ def FSE_TE_prime1_T2(FpFmZ, alpha, TE, T1, T2, noadd=False):
     EE = relax_mat(TE/2., T1, T2)
     EE_prime = relax_mat_prime_T2(TE/2., T1, T2)
 
-    FpFmZ = np.dot(EE_prime, FpFmZ)    
+    FpFmZ = np.dot(EE_prime, FpFmZ)
     FpFmZ = grad(FpFmZ, noadd)
     FpFmZ = rf(FpFmZ, alpha)
     FpFmZ = grad(FpFmZ, noadd)
