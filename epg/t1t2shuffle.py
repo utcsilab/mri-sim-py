@@ -77,7 +77,7 @@ def t1t2shuffle_ex_prime_T1(angle_ex_rad, angles_rad, TE, TRs, M0, T1, T2, B1=1.
 
 def t1t2shuffle_prime_M0(angles_rad, TE, TRs, M0, T1, T2, B1=1.):
     """derivative of signal equation w.r.t. M0"""
-    return t1t2shuffle_prime_M0(pi/2, angles_rad, TE, TRs, 1., T1, T2, B1)
+    return t1t2shuffle_ex_prime_M0(pi/2, angles_rad, TE, TRs, 1., T1, T2, B1)
 
 def t1t2shuffle_ex_prime_M0(angle_ex_rad, angles_rad, TE, TRs, M0, T1, T2, B1=1.):
     """derivative of signal equation w.r.t. M0, with arbitrary RF excitation"""
