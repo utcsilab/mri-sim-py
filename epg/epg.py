@@ -278,7 +278,7 @@ def FSE_signal2(angles_rad, phase_rad, TE, T1, T2, M0=np.array([[0.],[0.],[1.]])
         alpha_e, phi_e = excitation_dict['alpha_rad'], excitation_dict['phi_rad']
         P = rf(P, alpha_e, phi_e) # apply excitation pulse
     else:
-        P = np.array([[1.], [1.], [0.]]) # 90 degree CPGM excitation
+        P = np.array([[1.], [1.], [0.]]) # 90 degree CPMG excitation
 
     Mxy[0] = P[0,0]
     Mz[0] = np.real(P[2,0])
