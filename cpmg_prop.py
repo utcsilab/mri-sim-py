@@ -11,7 +11,7 @@ import pickle
 
 
 class PulseTrain:
-    def __init__(self, state_file, T, TE, TR, loss_fun, loss_fun_prime, angles_rad=None, verbose=False, step=.01, max_iter=100, prox_fun=None):
+    def __init__(self, state_file, T, TE, TR, loss_fun, loss_fun_prime, angles_rad=None, verbose=False, step=.01, max_iter=100, prox_fun=None, save_partial=100):
         self.state_file = state_file
         self.T = T
         self.TE = TE
@@ -22,6 +22,7 @@ class PulseTrain:
         self.max_iter = max_iter
         self.step = step
         self.verbose = verbose
+        self.save_partial = save_partial
 
         self.reset()
 
@@ -36,7 +37,7 @@ class PulseTrain:
             self.angles_rad = angles_rad[:self.T]
 
     def reset(self):
-        self.angles_rad = DEG2RAD(50 + (120 - 50) * np.random.rand(self.T))
+        self.angles_rad = DEG2RAD(50 + (180 - 50) * np.random.rand(self.T))
         self.loss = []
         self.sqrt_max_power = []
 
@@ -91,6 +92,8 @@ class PulseTrain:
             self.loss.append(self.loss_fun(theta1, self.angles_rad, self.TE, self.TR))
             str = '%d\t%3.5f\t%3.5f' % (i, self.loss[-1], self.sqrt_max_power[-1])
             self.print_verbose(str)
+            if i % self.save_partial == 0:
+                self.save_state(self.state_file)
 
     def print_verbose(self, str):
         if self.verbose:
@@ -228,6 +231,7 @@ def parser_defaults():
             'output_state_file': None,
             'input_angles_file': None,
             'output_angles_file': None,
+            'save_partial': 100,
             }
     return d
 
@@ -248,6 +252,7 @@ def get_parser(usage_str, description_str, version_str, parser_defaults):
     parser.add_argument('--output_state', action='store', type=str, dest='output_state_file', help='save state to pickle file')
     parser.add_argument('--input_angles', action='store', type=str, dest='input_angles_file', help='initialize angles from txt file')
     parser.add_argument('--output_angles', action='store', type=str, dest='output_angles_file', help='save angles to txt file')
+    parser.add_argument('--save_partial', action='store', type=int, dest='save_partial', help='save state every <int> epochs')
 
     parser.set_defaults(**parser_defaults)
 
@@ -278,6 +283,7 @@ if __name__ == "__main__":
 
     step = args.step
     max_iter = args.max_iter
+    save_partial = args.save_partial
     verbose = args.verbose
 
     input_angles_file = args.input_angles_file
@@ -340,7 +346,7 @@ if __name__ == "__main__":
     #plt.show()
 
 
-    P = PulseTrain(input_state_file, ETL, TE, TR, loss, loss_prime, angles_rad=angles_rad, verbose=verbose, max_iter=max_iter, step=step, prox_fun=prox_fun)
+    P = PulseTrain(output_state_file, ETL, TE, TR, loss, loss_prime, angles_rad=angles_rad, verbose=verbose, max_iter=max_iter, step=step, prox_fun=prox_fun, save_partial=save_partial)
 
     if input_state_file is not None:
         P.load_state(input_state_file)
