@@ -8,6 +8,9 @@ import time
 import sys
 from argparse import ArgumentParser
 import pickle
+import matplotlib.pyplot as plt
+
+
 
 
 class PulseTrain:
@@ -107,7 +110,7 @@ class PulseTrain:
         plt.xlim((0,self.T))
         plt.subplot(2,1,2)
         for theta in thetas:
-            plt.plot(range(self.T), epg.FSE_signal(self.angles_rad, self.TE, theta['T1'], theta['T2']))
+            plt.plot(range(self.T), epg.FSE_signal(self.angles_rad, self.TE, theta['T1'], theta['T2']) * (1 - exp(-(self.TR - self.T * self.TE)/theta['T1'])))
         plt.xlim((0,self.T))
         plt.ylim((0,1))
 
@@ -262,9 +265,6 @@ def get_parser(usage_str, description_str, version_str, parser_defaults):
 
 
 if __name__ == "__main__":
-    import matplotlib.pyplot as plt
-
-
     parser = get_parser(get_usage_str(), get_description_str(), get_version_str(), parser_defaults())
 
     print(get_description_str())
