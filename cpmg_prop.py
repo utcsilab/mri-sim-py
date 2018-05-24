@@ -114,6 +114,14 @@ class PulseTrain:
         plt.xlim((0,self.T))
         plt.ylim((0,1))
 
+    def compute_metrics(self, thetas):
+        flip_power = calc_power(self.angles_rad)
+        print('max\tmin\tpow')
+        print('{}\t{}\t{}'.format(RAD2DEG(np.max(self.angles_rad)), RAD2DEG(np.min(self.angles_rad)), flip_power))
+        for i, theta in enumerate(thetas):
+            print('SNR theta {}: {}'.format(i, calc_SNR(self.loss_fun(theta, self.angles_rad, self.TE, self.TR))))
+
+
     def forward(self, theta):
         return epg.FSE_signal(self.angles_rad, TE, theta['T1'], theta['T2']).ravel()
 
@@ -160,6 +168,14 @@ def prox_fun(theta, angles_rad, mu):
         return angles_rad / q1 * A
     else:
         return angles_rad
+
+def calc_power(angles_rad):
+    return np.linalg.norm(angles_rad)**2
+
+def calc_SNR(sig):
+    return np.linalg.norm(sig)
+
+
 
 
 def numerical_gradient(theta1, angles_rad, TE, TR):
