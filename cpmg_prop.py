@@ -52,6 +52,7 @@ class PulseTrain:
                 'TE': self.TE,
                 'TR': self.TR,
                 'verbose': self.verbose,
+                'save_partial': self.save_partial,
                 }
         if filename is None:
             filename = self.state_file
@@ -79,6 +80,7 @@ class PulseTrain:
         self.TE = state['TE']
         self.TR = state['TR']
         self.verbose = state['verbose']
+        self.save_partial = state['save_partial']
 
 
     def train(self, theta1):
