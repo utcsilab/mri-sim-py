@@ -2,6 +2,7 @@
 
 import numpy as np
 from numpy import pi, cos, sin, exp, conj
+import scipy.optimize
 from warnings import warn
 import epgcpmg as epg
 import time
@@ -14,7 +15,7 @@ import matplotlib.pyplot as plt
 
 
 class PulseTrain:
-    def __init__(self, state_file, T, TE, TR, loss_fun, loss_fun_prime, angles_rad=None, verbose=False, step=.01, max_iter=100, prox_fun=None, save_partial=100):
+    def __init__(self, state_file, T, TE, TR, loss_fun, loss_fun_prime, angles_rad=None, verbose=False, step=.01, max_iter=100, prox_fun=None, prox_fun_prime=None, save_partial=100, solver='pgd', solver_opts={'step':.01, 'max_iter': 100}, min_flip_rad=0, max_flip_rad=np.pi):
         self.state_file = state_file
         self.T = T
         self.TE = TE
@@ -22,10 +23,15 @@ class PulseTrain:
         self.loss_fun = loss_fun
         self.loss_fun_prime = loss_fun_prime
         self.prox_fun = prox_fun
+        self.prox_fun_prime = prox_fun_prime
         self.max_iter = max_iter
         self.step = step
         self.verbose = verbose
         self.save_partial = save_partial
+        self.solver = solver
+        self.solver_opts = solver_opts
+        self.min_flip_rad=min_flip_rad,
+        self.max_flip_rad=max_flip_rad
 
         self.reset()
 
@@ -49,13 +55,15 @@ class PulseTrain:
                 'angles_rad': self.angles_rad,
                 'loss': self.loss,
                 'sqrt_max_power': self.sqrt_max_power,
-                'max_iter': self.max_iter,
-                'step': self.step,
+                'solver_opts': self.solver_opts,
+                'solver': self.solver,
                 'T': self.T,
                 'TE': self.TE,
                 'TR': self.TR,
                 'verbose': self.verbose,
                 'save_partial': self.save_partial,
+                'min_flip_rad': self.min_flip_rad,
+                'max_flip_rad': self.max_flip_rad,
                 }
         if filename is None:
             filename = self.state_file
@@ -74,31 +82,104 @@ class PulseTrain:
         state = pickle.load(pickle_in)
         pickle_in.close()
 
-        self.angles_rad = state['angles_rad']
-        self.loss = state['loss']
-        self.sqrt_max_power = state['sqrt_max_power']
-        self.max_iter = state['max_iter']
-        self.step = state['step']
-        self.T = state['T']
-        self.TE = state['TE']
-        self.TR = state['TR']
-        self.verbose = state['verbose']
-        self.save_partial = state['save_partial']
+        try:
+            self.angles_rad = state['angles_rad']
+        except:
+            self.angles_rad = None
+        try:
+            self.loss = state['loss']
+        except:
+            self.loss = None
+        try:
+            self.sqrt_max_power = state['sqrt_max_power']
+        except:
+            self.sqrt_max_power = None 
+        try:
+            self.solver = state['solver']
+        except:
+            self.solver = None
+        try:
+            self.solver_opts = state['solver_opts']
+        except:
+            self.solver_opts = None
+        try:
+            self.T = state['T']
+        except:
+            self.T = None
+        try:
+            self.TE = state['TE']
+        except:
+            self.TE = None
+        try:
+            self.TR = state['TR']
+        except:
+            self.TR = None
+        try:
+            self.verbose = state['verbose']
+        except:
+            self.verbose = None
+        try:
+            self.save_partial = state['save_partial']
+        except:
+            self.save_partial = None
+        try:
+            self.min_flip_rad = state['min_flip_rad']
+        except:
+            self.min_flip_rad = None
+        try:
+            self.max_flip_rad = state['max_flip_rad']
+        except:
+            self.max_flip_rad = None
 
 
     def train(self, theta1):
-        for i in range(self.max_iter):
-            angles_prime = self.loss_fun_prime(theta1, self.angles_rad, self.TE, self.TR)
-            self.angles_rad = self.angles_rad + self.step * angles_prime
-            if self.prox_fun is not None:
-                self.angles_rad = self.prox_fun(theta1, self.angles_rad, self.step)
-            self.sqrt_max_power.append(np.linalg.norm(self.angles_rad))
+        tic = time.time()
 
-            self.loss.append(self.loss_fun(theta1, self.angles_rad, self.TE, self.TR))
-            str = '%d\t%3.5f\t%3.5f' % (i, self.loss[-1], self.sqrt_max_power[-1])
-            self.print_verbose(str)
-            if i % self.save_partial == 0:
-                self.save_state(self.state_file)
+        if self.solver == 'pgd':
+            max_iter = self.solver_opts['max_iter']
+            step = self.solver_opts['step']
+            for i in range(max_iter):
+                angles_prime = self.loss_fun_prime(theta1, self.angles_rad, self.TE, self.TR)
+                self.angles_rad = self.angles_rad + step * angles_prime
+                if self.prox_fun is not None:
+                    self.angles_rad = self.prox_fun(theta1, self.angles_rad, self.step)
+                self.angles_rad[self.angles_rad < self.min_flip_rad] = self.min_flip_rad
+                self.angles_rad[self.angles_rad > self.max_flip_rad] = self.max_flip_rad
+                if i % self.save_partial == 0:
+                    self.save_state(self.state_file)
+                    self.sqrt_max_power.append(np.linalg.norm(self.angles_rad))
+                    self.loss.append(self.loss_fun(theta1, self.angles_rad, self.TE, self.TR))
+                    str = '%d\t%3.5f\t%3.5f' % (i, self.loss[-1], self.sqrt_max_power[-1])
+                    self.print_verbose(str)
+
+        elif self.solver == 'scipy':
+
+            def myloss(x, info):
+                self.angles_rad = x
+                info['nfev'] += 1
+                if info['nfev'] % self.save_partial == 0:
+                    self.save_state(self.state_file)
+                    self.sqrt_max_power.append(np.linalg.norm(self.angles_rad))
+                    self.loss.append(self.loss_fun(theta1, self.angles_rad, self.TE, self.TR))
+                    str = '%d\t%3.5f\t%3.5f' % (info['nfev'], self.loss[-1], self.sqrt_max_power[-1])
+                    self.print_verbose(str)
+                return -self.loss_fun(theta1, x, self.TE, self.TR)
+
+            res = scipy.optimize.minimize(myloss, self.angles_rad,
+                    args=({'nfev': 0},),
+                    jac=lambda x, y: -self.loss_fun_prime(theta1, x, self.TE, self.TR),
+                    bounds=np.array([self.min_flip_rad * np.ones((P.T,)), self.max_flip_rad * np.ones((P.T,))]).T,
+                    constraints=({'type': 'ineq', 'fun': lambda x: theta1['sqrt_max_power'] - np.linalg.norm(x)}),
+                    options={'maxiter': self.solver_opts['max_iter']}, method='SLSQP')
+            if self.verbose:
+                print(res)
+            self.angles_rad = res.x
+        else:
+            print('ERROR: {} not a recognized solver'.format(self.solver))
+            sys.exit(-1)
+        toc = time.time()
+        if verbose:
+            print('finished optimization in {:.2f} s'.format(toc - tic))
 
     def print_verbose(self, str):
         if self.verbose:
@@ -160,8 +241,6 @@ def get_params(theta):
     return theta['T1'], theta['T2']
 
 def prox_fun(theta, angles_rad, mu):
-    angles_rad[angles_rad<0] = 0
-    angles_rad[angles_rad>np.pi] = np.pi
     A = theta['sqrt_max_power']
     q1 = np.linalg.norm(angles_rad)
     if q1 > A:
@@ -243,6 +322,8 @@ def parser_defaults():
             'verbose': False,
             'step': .1,
             'max_power': None,
+            'min_flip': 0,
+            'max_flip': 180,
             'esp': 5,
             'etl': 20,
             'TR': 1500,
@@ -253,6 +334,7 @@ def parser_defaults():
             'input_angles_file': None,
             'output_angles_file': None,
             'save_partial': 100,
+            'solver': 'pgd',
             }
     return d
 
@@ -264,6 +346,8 @@ def get_parser(usage_str, description_str, version_str, parser_defaults):
     parser.add_argument('--step', action='store', dest='step', type=float, help='step size')
     parser.add_argument('--verbose', action='store_true', dest='verbose', help='verbose')
     parser.add_argument('--max_power', action='store', dest='max_power', type=float, help='max power constraint')
+    parser.add_argument('--min_flip', action='store', dest='min_flip', type=float, help='min flip angle in deg')
+    parser.add_argument('--max_flip', action='store', dest='max_flip', type=float, help='max flip angle in deg')
     parser.add_argument('--esp', action='store', dest='esp', type=float, help='echo spacing in ms')
     parser.add_argument('--etl', action='store', dest='etl', type=int, help='echo train length')
     parser.add_argument('--T1', action='store', dest='T1', type=float, help='T1 in ms')
@@ -274,6 +358,7 @@ def get_parser(usage_str, description_str, version_str, parser_defaults):
     parser.add_argument('--input_angles', action='store', type=str, dest='input_angles_file', help='initialize angles from txt file')
     parser.add_argument('--output_angles', action='store', type=str, dest='output_angles_file', help='save angles to txt file')
     parser.add_argument('--save_partial', action='store', type=int, dest='save_partial', help='save state every <int> epochs')
+    parser.add_argument('--solver', action='store', type=str, dest='solver', help='solver type (pgd -- prox grad desc, scipy -- scipy optimizer')
 
     parser.set_defaults(**parser_defaults)
 
@@ -294,11 +379,14 @@ if __name__ == "__main__":
     T1 = args.T1 * 1e-3
     T2 = args.T2 * 1e-3
     max_power = args.max_power
+    min_flip = args.min_flip
+    max_flip = args.max_flip
 
     TE = args.esp * 1e-3
     TR = args.TR * 1e-3
     ETL = args.etl
 
+    solver = args.solver
     step = args.step
     max_iter = args.max_iter
     save_partial = args.save_partial
@@ -314,6 +402,7 @@ if __name__ == "__main__":
 
     if input_angles_file is None:
         angles = 120  * np.ones((ETL,))
+        angles = RAD2DEG(np.sqrt(max_power / ETL)) * np.ones((ETL,))
     else:
         angles = read_angles(input_angles_file)
 
@@ -363,8 +452,9 @@ if __name__ == "__main__":
     #plt.title('T1 = %.2f ms, T2 = %.2f ms' % (T1 * 1000, T2 * 1000))
     #plt.show()
 
+    solver_opts = {'max_iter': max_iter, 'step': step}
 
-    P = PulseTrain(output_state_file, ETL, TE, TR, loss, loss_prime, angles_rad=angles_rad, verbose=verbose, max_iter=max_iter, step=step, prox_fun=prox_fun, save_partial=save_partial)
+    P = PulseTrain(output_state_file, ETL, TE, TR, loss, loss_prime, angles_rad=angles_rad, verbose=verbose, solver=solver, solver_opts=solver_opts, prox_fun=prox_fun, save_partial=save_partial, min_flip_rad=DEG2RAD(min_flip), max_flip_rad=DEG2RAD(max_flip))
 
     if input_state_file is not None:
         P.load_state(input_state_file)
