@@ -132,23 +132,23 @@ class PulseTrain:
             self.max_flip_rad = None
 
 
-    def train(self, theta1):
+    def train(self, thetas):
         tic = time.time()
 
         if self.solver == 'pgd':
             max_iter = self.solver_opts['max_iter']
             step = self.solver_opts['step']
             for i in range(max_iter):
-                angles_prime = self.loss_fun_prime(theta1, self.angles_rad, self.TE, self.TR)
+                angles_prime = self.loss_fun_prime(thetas, self.angles_rad, self.TE, self.TR)
                 self.angles_rad = self.angles_rad + step * angles_prime
                 if self.prox_fun is not None:
-                    self.angles_rad = self.prox_fun(theta1, self.angles_rad, self.step)
+                    self.angles_rad = self.prox_fun(thetas, self.angles_rad, self.step)
                 self.angles_rad[self.angles_rad < self.min_flip_rad] = self.min_flip_rad
                 self.angles_rad[self.angles_rad > self.max_flip_rad] = self.max_flip_rad
                 if i % self.save_partial == 0:
                     self.save_state(self.state_file)
                     self.sqrt_max_power.append(np.linalg.norm(self.angles_rad))
-                    self.loss.append(self.loss_fun(theta1, self.angles_rad, self.TE, self.TR))
+                    self.loss.append(self.loss_fun(thetas, self.angles_rad, self.TE, self.TR))
                     str = '%d\t%3.5f\t%3.5f' % (i, self.loss[-1], self.sqrt_max_power[-1])
                     self.print_verbose(str)
 
@@ -160,16 +160,16 @@ class PulseTrain:
                 if info['nfev'] % self.save_partial == 0:
                     self.save_state(self.state_file)
                     self.sqrt_max_power.append(np.linalg.norm(self.angles_rad))
-                    self.loss.append(self.loss_fun(theta1, self.angles_rad, self.TE, self.TR))
+                    self.loss.append(self.loss_fun(thetas, self.angles_rad, self.TE, self.TR))
                     str = '%d\t%3.5f\t%3.5f' % (info['nfev'], self.loss[-1], self.sqrt_max_power[-1])
                     self.print_verbose(str)
-                return -self.loss_fun(theta1, x, self.TE, self.TR)
+                return -self.loss_fun(thetas, x, self.TE, self.TR)
 
             res = scipy.optimize.minimize(myloss, self.angles_rad,
                     args=({'nfev': 0},),
-                    jac=lambda x, y: -self.loss_fun_prime(theta1, x, self.TE, self.TR),
+                    jac=lambda x, y: -self.loss_fun_prime(thetas, x, self.TE, self.TR),
                     bounds=np.array([self.min_flip_rad * np.ones((P.T,)), self.max_flip_rad * np.ones((P.T,))]).T,
-                    constraints=({'type': 'ineq', 'fun': lambda x: theta1['sqrt_max_power'] - np.linalg.norm(x)}),
+                    constraints=({'type': 'ineq', 'fun': lambda x: thetas[0]['sqrt_max_power'] - np.linalg.norm(x)}),
                     options={'maxiter': self.solver_opts['max_iter']}, method='SLSQP')
             if self.verbose:
                 print(res)
@@ -203,36 +203,30 @@ class PulseTrain:
             print('SNR theta {}: {}'.format(i, calc_SNR(self.loss_fun(theta, self.angles_rad, self.TE, self.TR))))
 
 
-    def forward(self, theta):
-        return epg.FSE_signal(self.angles_rad, TE, theta['T1'], theta['T2']).ravel()
 
-
-def loss(theta1, angles_rad, TE, TR):
+def loss(thetas, angles_rad, TE, TR):
     T = len(angles_rad)
     
-    x1 = epg.FSE_signal(angles_rad, TE, theta1['T1'], theta1['T2']) * (1 - exp(-(TR - T * TE)/theta1['T1']))
+    l = 0
+    for theta in thetas:
+        x1 = epg.FSE_signal(angles_rad, TE, theta['T1'], theta['T2']) * (1 - exp(-(TR - T * TE)/theta['T1']))
+        l += 0.5 * np.dot(x1.ravel(), x1.ravel())
 
-    return 0.5 * np.linalg.norm(x1, ord=2)**2
+    return l
 
-def normalized_loss(theta1, angles_rad, TE, TR):
-    T = len(angles_rad)
-    x1 = epg.FSE_signal(angles_rad, TE, theta1['T1'], theta1['T2']) * (1 - exp(-(TR - T * TE)/theta1['T1']))
-
-    x1 = x1 / np.linalg.norm(x1, ord=2)
-
-    return np.dot(x1.ravel(), x1.ravel())
-
-
-def loss_prime(theta1, angles_rad, TE, TR):
-    T = len(angles_rad)
-    x1 = epg.FSE_signal(angles_rad, TE, theta1['T1'], theta1['T2']).ravel() * (1 - exp(-(TR - T * TE)/theta1['T1']))
+def loss_prime(thetas, angles_rad, TE, TR):
 
     T = len(angles_rad)
     alpha_prime = np.zeros((T,))
 
-    for i in range(T):
-        x1_prime = epg.FSE_signal_prime_alpha_idx(angles_rad, TE, theta1['T1'], theta1['T2'], i).ravel() * (1 - exp(-(TR - T * TE)/theta1['T1']))
-        alpha_prime[i] = np.dot(x1, x1_prime)
+    for theta in thetas:
+
+        x1 = epg.FSE_signal(angles_rad, TE, theta['T1'], theta['T2']).ravel() * (1 - exp(-(TR - T * TE)/theta['T1']))
+
+        for i in range(T):
+
+            x1_prime = epg.FSE_signal_prime_alpha_idx(angles_rad, TE, theta['T1'], theta['T2'], i).ravel() * (1 - exp(-(TR - T * TE)/theta['T1']))
+            alpha_prime[i] += np.dot(x1, x1_prime)
 
     return alpha_prime
 
@@ -257,7 +251,7 @@ def calc_SNR(sig):
 
 
 
-def numerical_gradient(theta1, angles_rad, TE, TR):
+def numerical_gradient(loss_fun, thetas, angles_rad, TE, TR):
     initial_params = angles_rad
     num_grad = np.zeros(initial_params.shape)
     perturb = np.zeros(initial_params.shape)
@@ -265,8 +259,8 @@ def numerical_gradient(theta1, angles_rad, TE, TR):
 
     for p in range(len(initial_params)):
         perturb[p] = e
-        loss2 = loss(theta1, angles_rad + perturb, TE, TR)
-        loss1 = loss(theta1, angles_rad - perturb, TE, TR)
+        loss2 = loss_fun(thetas, angles_rad + perturb, TE, TR)
+        loss1 = loss_fun(thetas, angles_rad - perturb, TE, TR)
 
         num_grad[p] = (loss2 - loss1) / (2 * e)
 
@@ -294,17 +288,6 @@ def write_angles(fliptable, angles):
         f.write('%f\n' % a)
     f.close()
 
-#def print_table(P1, P2, P3):
-    #print
-    #print '\tP1\tP2\tP3\nloss\t%3.3f\t%3.3f\t%3.3f\nnloss\t%3.3f\t%3.3f\t%3.3f\n' % (
-            #loss(theta1, P1.angles_rad, TE, TR),
-            #loss(theta1, P2.angles_rad, TE, TR),
-            #loss(theta1, P3.angles_rad, TE, TR),
-            #normalized_loss(theta1, P1.angles_rad, TE, TR),
-            #normalized_loss(theta1, P2.angles_rad, TE, TR),
-            #normalized_loss(theta1, P3.angles_rad, TE, TR)
-            #)
-
 
 def get_usage_str():
     return "usage: %(prog)s [options]"
@@ -329,6 +312,7 @@ def parser_defaults():
             'TR': 1500,
             'T1': 1000,
             'T2': 100,
+            'T1T2_vals_file': None,
             'input_state_file': None,
             'output_state_file': None,
             'input_angles_file': None,
@@ -352,6 +336,7 @@ def get_parser(usage_str, description_str, version_str, parser_defaults):
     parser.add_argument('--etl', action='store', dest='etl', type=int, help='echo train length')
     parser.add_argument('--T1', action='store', dest='T1', type=float, help='T1 in ms')
     parser.add_argument('--T2', action='store', dest='T2', type=float, help='T2 in ms')
+    parser.add_argument('--T1T2_vals', action='store', dest='T1T2_vals_file', type=str, help='use T1 and T2 values from T1T2_vals.npy (in ms)')
     parser.add_argument('--TR', action='store', dest='TR', type=float, help='TR in ms')
     parser.add_argument('--input_state', action='store', type=str, dest='input_state_file', help='initialize state from pickle file')
     parser.add_argument('--output_state', action='store', type=str, dest='output_state_file', help='save state to pickle file')
@@ -398,6 +383,16 @@ if __name__ == "__main__":
     input_state_file = args.input_state_file
     output_state_file = args.output_state_file
 
+    T1T2_vals_file = args.T1T2_vals_file
+
+    if T1T2_vals_file is not None:
+        if verbose:
+            print('Using T1,T2 values from {}'.format(T1T2_vals_file))
+        T1T2_vals = np.load(T1T2_vals_file) * 1e-3
+    else:
+        T1T2_vals = np.array([[T1], [T2]]).T
+
+    n_theta = T1T2_vals.shape[0]
 
 
     if input_angles_file is not None:
@@ -411,18 +406,13 @@ if __name__ == "__main__":
 
     TT = len(angles)
     if TT < ETL:
-        warn('warning: number of input flip angles ({1}) less than ETL ({2}), setting ETL to {1}'.format(TT, ETL))
+        warn('warning: number of input flip angles ({0}) less than ETL ({1}), setting ETL to {0}'.format(TT, ETL))
         ETL = TT
     elif TT > ETL:
-        warn('warning: number of input flip angles ({1}) greater than ETL ({2}), clipping flip angles'.format(TT, ETL))
+        warn('warning: number of input flip angles ({0}) greater than ETL ({1}), clipping flip angles'.format(TT, ETL))
         angles = angles[:ETL]
 
     angles_rad = DEG2RAD(angles)
-
-    #S = epg.FSE_signal(angles_rad, TE, T1, T2)
-    #S2 = abs(S)
-
-    #max_power = ETL * (120 * np.pi / 180)**2
 
     if max_power is None:
         sqrt_max_power = None
@@ -432,12 +422,19 @@ if __name__ == "__main__":
         print('max power: {}'.format(max_power))
         print('sqrt max power: {}'.format(sqrt_max_power))
 
-    theta1 = {'T1': T1, 'T2': T2, 'sqrt_max_power': sqrt_max_power}
+    thetas = []
+    for i in range(n_theta):
+        T1, T2 = T1T2_vals[i,:]
+        thetas.append({'T1': T1, 'T2': T2, 'sqrt_max_power': sqrt_max_power})
+
+    if verbose:
+        print(thetas)
+
 
     t1 = time.time()
-    NG = numerical_gradient(theta1, angles_rad, TE, TR)
+    NG = numerical_gradient(loss, thetas, angles_rad, TE, TR)
     t2 = time.time()
-    LP = loss_prime(theta1, angles_rad, TE, TR)
+    LP = loss_prime(thetas, angles_rad, TE, TR)
     t3 = time.time()
 
     NG_time = t2 - t1
@@ -462,29 +459,10 @@ if __name__ == "__main__":
     if input_state_file is not None:
         P.load_state(input_state_file)
 
-    P.train(theta1)
+    P.train(thetas)
 
     if output_state_file is not None:
         P.save_state(output_state_file)
 
     if output_angles_file is not None:
         write_angles(output_angles_file, RAD2DEG(P.angles_rad))
-    #print_table(P1, P2, P3)
-
-    #plt.figure(1)
-    #plt.clf()
-    #P.plot_vals((theta1))
-
-    #plt.figure(2)
-    #plt.clf()
-    #P2.plot_vals((theta1))
-
-    #plt.figure(3)
-    #plt.clf()
-    #P3.plot_vals((theta1))
-
-    #plt.show()
-
-    MAX_ANGLE = DEG2RAD(120)
-    MIN_ANGLE = DEG2RAD(50)
-
