@@ -188,19 +188,29 @@ class PulseTrain:
     def plot_vals(self, thetas):
         plt.subplot(2,1,1)
         plt.plot(range(self.T), RAD2DEG(self.angles_rad), 'o-')
-        plt.xlim((0,self.T))
+        plt.title('ETL={} POW={:.1f} MAX={:.0f} MIN={:.0f}'.format(
+            self.T, calc_power(self.angles_rad), RAD2DEG(np.max(self.angles_rad)), RAD2DEG(np.min(self.angles_rad))))
+        plt.xlim((0, self.T))
+        #plt.ylim((np.max((0,.9*np.min(RAD2DEG(self.angles_rad))), 180)))
+        plt.ylim((.5*np.min(RAD2DEG(self.angles_rad)), 180))
+        plt.ylabel('flip angles (deg)')
         plt.subplot(2,1,2)
+        #leg_str = []
         for theta in thetas:
             plt.plot(range(self.T), epg.FSE_signal(self.angles_rad, self.TE, theta['T1'], theta['T2']) * (1 - exp(-(self.TR - self.T * self.TE)/theta['T1'])))
+            #leg_str.append('T1/T2={:.0f}/{:.0f}'.format(1000*theta['T1'], 1000*theta['T2']))
+        #plt.legend(leg_str)
         plt.xlim((0,self.T))
-        plt.ylim((0,1))
+        plt.ylim((0, 1.))
+        plt.ylabel('signal level')
 
     def compute_metrics(self, thetas):
         flip_power = calc_power(self.angles_rad)
         print('max\tmin\tpow')
         print('{}\t{}\t{}'.format(RAD2DEG(np.max(self.angles_rad)), RAD2DEG(np.min(self.angles_rad)), flip_power))
-        for i, theta in enumerate(thetas):
-            print('SNR theta {}: {}'.format(i, calc_SNR(self.loss_fun(theta, self.angles_rad, self.TE, self.TR))))
+        print('SNR: {}'.format(calc_SNR(self.loss_fun(thetas, self.angles_rad, self.TE, self.TR))))
+        #for i, theta in enumerate(thetas):
+            #print('SNR theta {}: {}'.format(i, calc_SNR(self.loss_fun([theta], self.angles_rad, self.TE, self.TR))))
 
 
 
@@ -445,12 +455,6 @@ if __name__ == "__main__":
     print('Analytical Gradient\t(%03.3f s)\t' % LP_time, LP)
     print()
     print('Error:', np.linalg.norm(NG - LP) / np.linalg.norm(NG))
-
-    #plt.plot(TE*1000*np.arange(1, ETL+1), S2)
-    #plt.xlabel('time (ms)')
-    #plt.ylabel('signal')
-    #plt.title('T1 = %.2f ms, T2 = %.2f ms' % (T1 * 1000, T2 * 1000))
-    #plt.show()
 
     solver_opts = {'max_iter': max_iter, 'step': step}
 
