@@ -400,11 +400,14 @@ if __name__ == "__main__":
 
 
 
-    if input_angles_file is None:
-        angles = 120  * np.ones((ETL,))
-        angles = RAD2DEG(np.sqrt(max_power / ETL)) * np.ones((ETL,))
+    if input_angles_file is not None:
+        try:
+            angles = read_angles(input_angles_file)
+        except:
+            warn('warning: cannot read from {}'.format(input_angles_file))
+            angles = RAD2DEG(np.sqrt(max_power / ETL)) * np.ones((ETL,))
     else:
-        angles = read_angles(input_angles_file)
+        angles = RAD2DEG(np.sqrt(max_power / ETL)) * np.ones((ETL,))
 
     TT = len(angles)
     if TT < ETL:
