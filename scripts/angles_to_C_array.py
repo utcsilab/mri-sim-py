@@ -19,18 +19,18 @@ for tr in trs:
         for pow in max_pows:
             filename = '{}_POW_{}_angles.txt'.format(base_name, pow)
             angles = np.loadtxt(filename)
-            fo.write('float flip_opt_TR_{}_ETL_{}_POW_{} = {{'.format(tr, etl, pow))
+            fo.write('float flip_opt_TR_{}_ETL_{}_POW_{}[{}] = {{'.format(tr, etl, pow, etl))
             for angle in angles[:-1]:
                 fo.write('{:5.1f}, '.format(angle))
             fo.write('{:5.1f}}};\n'.format(angles[-1]))
 
-        fo.write('float* flip_opt_TR_{}_ETL{}[] = {{'.format(tr, etl))
+        fo.write('float* flip_opt_TR_{}_ETL_{}[{}] = {{'.format(tr, etl, len(max_pows)))
         for pow in max_pows[:-1]:
             fo.write('flip_opt_TR_{}_ETL_{}_POW_{}, '.format(tr, etl, pow))
         fo.write('flip_opt_TR_{}_ETL_{}_POW_{}}};\n '.format(tr, etl, max_pows[-1]))
         fo.write('\n')
 
-    fo.write('float** flip_opt_TR_{}[] = {{'.format(tr))
+    fo.write('float** flip_opt_TR_{}[{}] = {{'.format(tr, len(etls)))
     for etl in etls[:-1]:
         fo.write('flip_opt_TR_{}_ETL_{}, '.format(tr, etl))
     fo.write('flip_opt_TR_{}_ETL_{}}};\n '.format(tr, etls[-1]))
