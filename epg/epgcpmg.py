@@ -3,9 +3,7 @@
 # EPG CPMG simulation code, based off of Matlab scripts from Brian Hargreaves <bah@stanford.edu>
 # 2015 Jonathan Tamir <jtamir@eecs.berkeley.edu>
 
-from __future__ import division
 import numpy as np
-from numpy import pi, cos, sin, exp, conj
 from warnings import warn
 
 def rf(FpFmZ, alpha):
@@ -30,14 +28,14 @@ def rf2(FpFmZ, alpha):
     # -- From Weigel at al, JMRI 41(2015)266-295, Eq. 21.
 
     
-    if abs(alpha) > 2 * pi:
+    if abs(alpha) > 2 * np.pi:
         warn('rf2: Flip angle should be in radians! alpha=%f' % alpha)
 
-    cosa2 = cos(alpha/2.)**2
-    sina2 = sin(alpha/2.)**2
+    cosa2 = np.cos(alpha/2.)**2
+    sina2 = np.sin(alpha/2.)**2
 
-    cosa = cos(alpha)
-    sina = sin(alpha)
+    cosa = np.cos(alpha)
+    sina = np.sin(alpha)
 
     RR = np.array([ [cosa2, sina2, sina],
                     [sina2, cosa2, -sina],
@@ -72,14 +70,14 @@ def rf2_ex(FpFmZ, alpha):
         pass
 
 
-    if abs(alpha) > 2 * pi:
+    if abs(alpha) > 2 * np.pi:
         warn('rf2_ex: Flip angle should be in radians! alpha=%f' % alpha)
 
-    cosa2 = cos(alpha/2.)**2
-    sina2 = sin(alpha/2.)**2
+    cosa2 = np.cos(alpha/2.)**2
+    sina2 = np.sin(alpha/2.)**2
 
-    cosa = cos(alpha)
-    sina = sin(alpha)
+    cosa = np.cos(alpha)
+    sina = np.sin(alpha)
 
     RR = np.array([ [cosa2, -sina2, sina],
                     [-sina2, cosa2, sina],
@@ -110,12 +108,12 @@ def rf_prime2(FpFmZ, alpha):
 
     """
 
-    if abs(alpha) > 2 * pi:
+    if abs(alpha) > 2 * np.pi:
         warn('rf_prime2: Flip angle should be in radians! alpha=%f' % alpha)
 
-    RR = np.array([ [-cos(alpha/2.) * sin(alpha/2.), cos(alpha/2.) * sin(alpha/2.), cos(alpha)],
-                    [cos(alpha/2.) * sin(alpha/2.), -cos(alpha/2.) * sin(alpha/2.), -cos(alpha)],
-                    [-0.5 * cos(alpha), 0.5 * cos(alpha), -sin(alpha)] ])
+    RR = np.array([ [-np.cos(alpha/2.) * np.sin(alpha/2.), np.cos(alpha/2.) * np.sin(alpha/2.), np.cos(alpha)],
+                    [np.cos(alpha/2.) * np.sin(alpha/2.), -np.cos(alpha/2.) * np.sin(alpha/2.), -np.cos(alpha)],
+                    [-0.5 * np.cos(alpha), 0.5 * np.cos(alpha), -np.sin(alpha)] ])
 
     FpFmZ = np.dot(RR, FpFmZ)
 
@@ -142,15 +140,15 @@ def rf_B1_prime2(FpFmZ, alpha, B1):
 
     """
 
-    if abs(alpha) > 2 * pi:
+    if abs(alpha) > 2 * np.pi:
         warn('rf_B1_prime2: Flip angle should be in radians! alpha=%f' % alpha)
 
     if B1 < 0 or B1 > 2:
         warn('rf_B1_prime2: B1 Homogeneity should be a percentage between (0, 2)')
 
-    RR = np.array([ [-alpha*cos(B1*alpha/2.) * sin(B1*alpha/2.), alpha*cos(B1*alpha/2.) * sin(B1*alpha/2.), alpha*cos(B1*alpha)],
-                    [alpha*cos(B1*alpha/2.) * sin(B1*alpha/2.), -alpha*cos(B1*alpha/2.) * sin(B1*alpha/2.), -alpha*cos(B1*alpha)],
-                    [-0.5*alpha*cos(B1*alpha), 0.5*alpha*cos(B1*alpha), -alpha*sin(B1*alpha)] ])
+    RR = np.array([ [-alpha*np.cos(B1*alpha/2.) * np.sin(B1*alpha/2.), alpha*np.cos(B1*alpha/2.) * np.sin(B1*alpha/2.), alpha*np.cos(B1*alpha)],
+                    [alpha*np.cos(B1*alpha/2.) * np.sin(B1*alpha/2.), -alpha*np.cos(B1*alpha/2.) * np.sin(B1*alpha/2.), -alpha*np.cos(B1*alpha)],
+                    [-0.5*alpha*np.cos(B1*alpha), 0.5*alpha*np.cos(B1*alpha), -alpha*np.sin(B1*alpha)] ])
 
     FpFmZ = np.dot(RR, FpFmZ)
 
@@ -171,15 +169,15 @@ def rf_ex_B1_prime(FpFmZ, alpha, B1):
         FpFmZ = Derivative of FpFmZ state w.r.t. alpha
     """
 
-    if abs(alpha) > 2 * pi:
+    if abs(alpha) > 2 * np.pi:
         warn('rf_ex_B1_prime2: Flip angle should be in radians! alpha=%f' % alpha)
 
     if B1 < 0 or B1 > 2:
         warn('rf_ex_B1_prime: B1 Homogeneity should be a percentage between (0, 2)')
 
-    RR = np.array([ [-alpha*cos(B1*alpha/2.) * sin(B1*alpha/2.), alpha*cos(B1*alpha/2.) * sin(B1*alpha/2.), alpha*cos(B1*alpha)],
-                    [alpha*cos(B1*alpha/2.) * sin(B1*alpha/2.), -alpha*cos(B1*alpha/2.) * sin(B1*alpha/2.), alpha*cos(B1*alpha)],
-                    [-0.5*alpha*cos(B1*alpha), -0.5*alpha*cos(B1*alpha), -alpha*sin(B1*alpha)] ])
+    RR = np.array([ [-alpha*np.cos(B1*alpha/2.) * np.sin(B1*alpha/2.), alpha*np.cos(B1*alpha/2.) * np.sin(B1*alpha/2.), alpha*np.cos(B1*alpha)],
+                    [alpha*np.cos(B1*alpha/2.) * np.sin(B1*alpha/2.), -alpha*np.cos(B1*alpha/2.) * np.sin(B1*alpha/2.), alpha*np.cos(B1*alpha)],
+                    [-0.5*alpha*np.cos(B1*alpha), -0.5*alpha*np.cos(B1*alpha), -alpha*np.sin(B1*alpha)] ])
 
     FpFmZ = np.dot(RR, FpFmZ)
 
@@ -187,19 +185,19 @@ def rf_ex_B1_prime(FpFmZ, alpha, B1):
 
 
 def relax_mat(T, T1, T2):
-    E2 = exp(-T/T2)
-    E1 = exp(-T/T1)
+    E2 = np.exp(-T/T2)
+    E1 = np.exp(-T/T1)
 
     EE = np.diag([E2, E2, E1])      # Decay of states due to relaxation alone.
 
     return EE
 
 def relax_mat_prime_T1(T, T1, T2):
-    E1_prime_T1 = T * exp(-T/T1) / T1**2
+    E1_prime_T1 = T * np.exp(-T/T1) / T1**2
     return np.diag([0, 0, E1_prime_T1])
 
 def relax_mat_prime_T2(T, T1, T2):
-    E2_prime_T2 = T * exp(-T/T2) / T2**2
+    E2_prime_T2 = T * np.exp(-T/T2) / T2**2
     return np.diag([E2_prime_T2, E2_prime_T2, 0])
 
 
@@ -243,8 +241,8 @@ def relax2(FpFmZ, T, T1, T2):
 
    """
 
-    E2 = exp(-T/T2)
-    E1 = exp(-T/T1)
+    E2 = np.exp(-T/T2)
+    E1 = np.exp(-T/T1)
 
     EE = np.diag([E2, E2, E1])      # Decay of states due to relaxation alone.
     RR = 1 - E1                     # Mz Recovery, affects only Z0 state, as 
@@ -589,7 +587,7 @@ def FSE_signal(angles_rad, TE, T1, T2):
 def FSE_signal2(angles_rad, TE, T1, T2):
     """Same as FSE_signal2_ex, but assumes excitation pulse is 90 degrees"""
 
-    return FSE_signal2_ex(pi/2., angles_rad, TE, T1, T2)
+    return FSE_signal2_ex(np.pi/2., angles_rad, TE, T1, T2)
 
 
 def FSE_signal2_ex(angle_ex_rad, angles_rad, TE, T1, T2, B1=1.):
@@ -647,7 +645,7 @@ if __name__ == "__main__":
 
     N = 100
     angles = 120 * np.ones((N,))
-    angles_rad = angles * pi / 180.
+    angles_rad = angles * np.pi / 180.
 
     S = FSE_signal(angles_rad, TE, T1, T2)
     S2 = abs(S)

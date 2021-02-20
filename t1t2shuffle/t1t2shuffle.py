@@ -6,7 +6,7 @@
 from __future__ import division
 import numpy as np
 from numpy import pi, exp
-import epgcpmg as epg
+import epg.epgcpmg as epg
 
 def T1_recovery(T, T1):
     return exp(-T/T1)
@@ -51,7 +51,7 @@ def t1t2shuffle_ex_prime_T2(angle_ex_rad, angles_rad, TE, TRs, M0, T1, T2, B1=1.
     Ej = T1_recovery(URs, T1)[None,:]
     
     sig_prime = M0 * (1 - Ej) * (fi_prime * (1 - Ej*fi[-1]) + Ej*fi_prime[-1]*fi) / (1 - Ej*fi[-1])**2
-    
+
     return sig_prime.ravel(order='F')
 
 def t1t2shuffle_prime_T1(angles_rad, TE, TRs, M0, T1, T2, B1=1.):
