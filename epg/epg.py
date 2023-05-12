@@ -294,6 +294,45 @@ def FSE_signal2(angles_rad, phase_rad, TE, T1, T2, M0=np.array([[0.],[0.],[1.]])
 
     return Mxy, Mz
 
+def diff(FpFmZ,T1,T2,T,kg,D,Gon,noadd = False):
+    
+    #relaxation
+    FpFmZ = relax(FpFmZ, T,T1,T2)
+
+    #Model Diffusion Effects
+    Findex = np.arange(FpFmZ.shape[1])
+    bvalZ = pow((Findex)*kg,2)*T
+    bvalp = (pow(( Findex+.5*Gon)*kg,2)+Gon*pow(kg,2)/12)*T
+    bvalm = (pow((-Findex+.5*Gon)*kg,2)+Gon*pow(kg,2)/12)*T
+
+
+
+    FpFmZ[0,:] = FpFmZ[0,:] * np.exp(-bvalp*D)
+    FpFmZ[1,:] = FpFmZ[1,:] * np.exp(-bvalm*D)
+    FpFmZ[2,:] = FpFmZ[2,:] * np.exp(-bvalZ*D) 
+    
+    
+    
+    if Gon==1:
+        if kg>=0:
+            FpFmZ = grad(FpFmZ,noadd)
+        else:
+            FpFmZ = mgrad(FpFmZ, noadd)
+            
+    return FpFmZ
+
+def mgrad(FpFmZ, noadd=False):
+    if noadd == False:
+        FpFmZ = np.hstack((FpFmZ, [[0],[0],[0]]))   # add higher dephased state
+
+    FpFmZ[0,:] = np.roll(FpFmZ[0,:], -1)     # shift Fp states
+    FpFmZ[1,:] = np.roll(FpFmZ[1,:], 1)    # shift Fm states
+    FpFmZ[0,-1] = 0                         # Zero highest Fm state
+    FpFmZ[1,0] = np.conj(FpFmZ[0,0])           # Fill in lowest Fp state
+
+    return FpFmZ
+
+
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
 
