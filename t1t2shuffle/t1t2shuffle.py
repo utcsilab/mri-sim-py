@@ -6,7 +6,8 @@
 from __future__ import division
 import numpy as np
 from numpy import pi, exp
-import epg.epgcpmg as epg
+#import epg.epgcpmg as epg
+import epgcpmg as epg
 
 def T1_recovery(T, T1):
     return exp(-T/T1)
